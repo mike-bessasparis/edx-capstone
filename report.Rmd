@@ -1,0 +1,92 @@
+---
+title: "Report"
+output: html_notebook
+---
+
+```{r}
+
+library(tidyverse)
+library(readr)
+library(ggthemes)
+library(gridExtra)
+library(kableExtra)
+
+edx <- readRDS(file = "./rda/edx.rds")
+validation <- readRDS (file = "./rda/Validation.rds")
+
+small_edx <- edx[1:1000, ]
+
+```
+
+
+# Explore variables
+```{r}
+
+summary(edx)
+
+head(edx)
+
+```
+
+## Response Variable: Rating
+```{r}
+
+summary(edx$rating)
+
+```
+
+```{r}
+
+edx %>% ggplot(aes(x=rating)) +
+  geom_histogram(binwidth = .5, col="grey") +
+  scale_x_continuous(breaks = seq(0, 5, .5)) +
+  theme_economist_white()
+
+edx %>% ggplot(aes(x=rating)) +
+  geom_histogram(binwidth = 1, col="grey") +
+  theme_economist_white()
+
+
+```
+
+```{r}
+
+#Find number of unique movies rated, number of unique users, and number of movies in each genre.
+
+mjb1 <- length(unique(edx$movieId))
+mjb2 <- length(unique(edx$userId))
+
+mjb3 <- edx %>% separate_rows(genres, sep = "\\|") %>% 
+  group_by(genres) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count)
+
+mjb4 <- nrow(mjb3)
+
+```
+In the dataset there are: 
+
+- `r mjb2` unique users
+- `r mjb1` unique movies rated
+- `r mjb4` unique movie genres
+
+Movies grouped by genre.  Note that a movie may be tagged with several genres, e.g., the movie "Boomerang" is classified as both a "Comedy" and a "Romance."
+```{r}
+
+mjb3 %>% ggplot() +
+  geom_col(aes(x = reorder(genres, -count), y = count)) +
+  coord_flip()
+
+```
+
+```{r}
+
+edx %>% 
+  group_by(movieId, title) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count)
+
+```
+
+
+

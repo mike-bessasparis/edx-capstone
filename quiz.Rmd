@@ -1,0 +1,50 @@
+---
+title: "EDX Capstone"
+output: html_notebook
+---
+
+```{r}
+
+library(tidyverse)
+library(stringr)
+library(readr)
+
+edx <- readRDS(file = "./rda/edx.rds")
+validation <- readRDS (file = "./rda/Validation.rds")
+
+small_edx <- edx[1:1000, ]
+
+str(edx)
+
+mjb <- edx %>% 
+  filter(rating == 3)
+
+count(mjb)
+
+mjb <- unique(edx$movieId)
+mjb2 <- unique(edx$title)
+
+mjb <- unique(edx$userId)
+
+small_edx <- edx[1:1000, ]
+count(edx %>% 
+  filter(str_detect(genres, "Drama")))
+
+df <- edx %>% 
+  group_by(movieId, title) %>% 
+  summarise(n())
+
+
+df <- edx %>% 
+  group_by(rating) %>% 
+  summarise(n())
+
+df <- edx %>% 
+  mutate(r = rating - as.integer(rating)) %>% 
+  group_by(r) %>% 
+  summarise(n())
+
+
+
+```
+
