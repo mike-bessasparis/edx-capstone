@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.rds
+.rda
+*.dat
+*.rds
+*.html
+*.Rproj
+.RDataTmp
+.RDataTmp1
+submission.csv
