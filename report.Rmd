@@ -11,6 +11,7 @@ library(ggthemes)
 library(gridExtra)
 library(kableExtra)
 library(corrplot)
+library(lubridate)
 
 edx <- readRDS(file = "./rda/edx.rds")
 validation <- readRDS (file = "./rda/Validation.rds")
@@ -86,6 +87,15 @@ mjb3 %>% ggplot() +
         axis.ticks.x.bottom = element_blank())
 
 ```
+
+```{r}
+
+edx %>% filter(genres == "(no genres listed)")
+
+```
+
+
+
 What are the top 10 reviewed movies?
 ```{r}
 
@@ -107,22 +117,63 @@ edx %>%
 
 ```
 ***
-# Correlations with Rating
+# Relationships I
+## Numeric Correlations with Rating
 No continuous numeric predictors to correlate with Rating; userId and movieId are discrete while timestamp is a date.
 
 *** 
 # Missing data, label encoding, and factorizing variables
-## Missing data
-First of all, I would like to see which variables contain missing values.
 ```{r}
+#
+# make a copy of the data to modify so I don't have to rebuild if something goes bad.
+#
+edx2 <- edx
 
-NAcol <- which(colSums(is.na(edx)) > 0)
+#
+# First of all, I would like to see which variables contain missing values.
+#
+NAcol <- which(colSums(is.na(edx2)) > 0)
 
 ```
+
 There are `r length(NAcol)` columns with at least one NA.
 
-## Label encoding
+```{r}
+
+# Label encoding
+# There are no labels that are ordinal and should be encoded as a number.
+
+#
+# Factorizing variables
+#
+# edx2 <- edx2 %>% 
+#   mutate(rating = factor(rating))
+
+edx2 <- edx2 %>% 
+  separate_rows(genres, sep = "\\|") %>% 
+  mutate(genres = factor(genres))
+
+edx2 %>% filter(genres == "(no genres listed)")
+# "Pull My Daisy (1958)" by Kerouac
+# IMDB lists the genre as "Short"
 
 
+#
+# Transform "timestamp" into a datetime object
+#
+edx2 <- edx2 %>% 
+  mutate(timestamp = as_datetime(timestamp))
 
-## Factorizing variables
+```
+
+***
+# Relationships II
+```{r}
+
+edx2 %>% 
+  group_by(genres) %>% 
+  summarise(avg = mean(rating)) %>% 
+  arrange(-avg)
+
+```
+
