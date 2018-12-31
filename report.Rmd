@@ -167,7 +167,7 @@ edx2 <- edx2 %>%
 ```
 
 ***
-# Relationships (part 2)
+# Relationships (part 2) somechanges
 ```{r}
 
 edx2 %>% 
