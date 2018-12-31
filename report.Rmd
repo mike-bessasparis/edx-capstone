@@ -96,7 +96,7 @@ edx %>% filter(genres == "(no genres listed)")
 
 
 
-What are the top 10 reviewed movies?
+What are the top 10 most reviewed movies?
 ```{r}
 
 edx %>% 
@@ -106,7 +106,7 @@ edx %>%
   top_n(10)
 
 ```
-Who are the top 10 reviewers?
+Who are the top 10 active reviewers?
 ```{r}
 
 edx %>% 
@@ -117,7 +117,7 @@ edx %>%
 
 ```
 ***
-# Relationships I
+# Relationships (part 1)
 ## Numeric Correlations with Rating
 No continuous numeric predictors to correlate with Rating; userId and movieId are discrete while timestamp is a date.
 
@@ -167,12 +167,12 @@ edx2 <- edx2 %>%
 ```
 
 ***
-# Relationships II
+# Relationships (part 2)
 ```{r}
 
 edx2 %>% 
   group_by(genres) %>% 
-  summarise(avg = mean(rating)) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
   arrange(-avg)
 
 ```
