@@ -10,6 +10,7 @@ library(readr)
 library(ggthemes)
 library(gridExtra)
 library(kableExtra)
+library(corrplot)
 
 edx <- readRDS(file = "./rda/edx.rds")
 validation <- readRDS (file = "./rda/Validation.rds")
@@ -18,7 +19,7 @@ small_edx <- edx[1:1000, ]
 
 ```
 
-
+***
 # Explore variables
 ```{r}
 
@@ -48,7 +49,7 @@ edx %>% ggplot(aes(x=rating)) +
 
 
 ```
-
+## Other interesting variables
 ```{r}
 
 #Find number of unique movies rated, number of unique users, and number of movies in each genre.
@@ -75,18 +76,53 @@ Movies grouped by genre.  Note that a movie may be tagged with several genres, e
 
 mjb3 %>% ggplot() +
   geom_col(aes(x = reorder(genres, -count), y = count)) +
-  coord_flip()
+  coord_flip() +
+  xlab("Genre") +
+  ylab("Number of Movies") +
+  theme_economist_white() +
+  theme(axis.text.y.left = element_text(hjust = 1),
+        panel.grid.major = element_blank(),
+        axis.ticks.y.left = element_line(),
+        axis.ticks.x.bottom = element_blank())
 
 ```
-
+What are the top 10 reviewed movies?
 ```{r}
 
 edx %>% 
-  group_by(movieId, title) %>% 
+  group_by(title) %>% 
   summarise(count = n()) %>% 
-  arrange(-count)
+  arrange(-count) %>% 
+  top_n(10)
 
 ```
+Who are the top 10 reviewers?
+```{r}
+
+edx %>% 
+  group_by(userId) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count) %>% 
+  top_n(10)
+
+```
+***
+# Correlations with Rating
+No continuous numeric predictors to correlate with Rating; userId and movieId are discrete while timestamp is a date.
+
+*** 
+# Missing data, label encoding, and factorizing variables
+## Missing data
+First of all, I would like to see which variables contain missing values.
+```{r}
+
+NAcol <- which(colSums(is.na(edx)) > 0)
+
+```
+There are `r length(NAcol)` columns with at least one NA.
+
+## Label encoding
 
 
 
+## Factorizing variables
