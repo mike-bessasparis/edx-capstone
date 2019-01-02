@@ -167,13 +167,42 @@ edx2 <- edx2 %>%
 ```
 
 ***
-# Relationships (part 2) somechanges
+# Relationships (part 2)
 ```{r}
-
+#genre and rating
 edx2 %>% 
   group_by(genres) %>% 
-  summarise(avg_rating = mean(rating)) %>% 
-  arrange(-avg)
+  summarise(avg_rating = mean(rating))%>% 
+  arrange(-avg_rating) %>% 
+  ggplot() +
+    geom_point(aes(y = reorder(genres, -avg_rating), x = avg_rating))
+```
+
+Average rating of each user.  Red represents a user in the extreme group - either very high (5) or very low (<=1).
+```{r}
+# user and rating
+mjb1 <- edx %>% 
+  group_by(userId) %>% 
+  summarise(avg_rating = mean(rating), std_dev = sd(rating))%>% 
+  arrange(-avg_rating)
+
+outliers <- mjb1 %>% 
+  filter(std_dev == 0)
+
+ggplot() +
+  geom_point(data = mjb1, aes(x = userId, y = avg_rating), color = "grey") +
+  geom_point(data = outliers, aes(x = userId, y = avg_rating), color = "red")  
 
 ```
+Let's look at the ratings of only these users
+```{r}
+
+edx %>%
+  filter(userId %in% outliers$userId) %>% 
+  ggplot() +
+    geom_point(aes(x = as.factor(reorder(userId, rating)), y = rating)) +
+    coord_flip()
+
+```
+
 
