@@ -254,17 +254,23 @@ rm(test_index, temp, removed, edx, small_edx)
 #write.csv(train, file="train.csv")
 #write.csv(validation, file="validation.csv")
 
+train <- read.csv("train.csv") %>% select(userId, movieId, rating, timestamp, title, genres)
+validation <- read.csv("validation.csv") %>% select(userId, movieId, rating, timestamp, title, genres)
+
 ```
 
 ```{r}
 library(rpart)
 
-fit <- train(rating ~ movieId,
+# split out genres
+train <- train %>% separate_rows(genres, sep = "\\|")
+validation <- validation %>% separate_rows(genres, sep = "\\|")
+
+fit <- train(rating ~ userId + genres,
              method="rpart",
              data=train)
-fit
 
-ggplot(fit, highlight = TRUE)
+fit
 
 plot(fit$finalModel, margin=.1)
 text(fit$finalModel, cex=.75)
@@ -273,7 +279,6 @@ y_hat <- round(predict(fit, validation, type="raw") / .5) * .5
 
 RMSE(y_hat, validation$rating)
 
-round
 
 ```
 
