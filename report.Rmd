@@ -12,11 +12,12 @@ library(gridExtra)
 library(kableExtra)
 library(corrplot)
 library(lubridate)
+library(caret)
 
 edx <- readRDS(file = "./rda/edx.rds")
 validation <- readRDS (file = "./rda/Validation.rds")
 
-small_edx <- edx[1:1000, ]
+small_edx <- sample_n(edx, 1000)
 
 ```
 
@@ -169,16 +170,30 @@ edx2 <- edx2 %>%
 ***
 # Relationships (part 2)
 ```{r}
+
 #genre and rating
 edx2 %>% 
   group_by(genres) %>% 
   summarise(avg_rating = mean(rating))%>% 
   arrange(-avg_rating) %>% 
   ggplot() +
-    geom_point(aes(y = reorder(genres, -avg_rating), x = avg_rating))
+    geom_point(aes(y = reorder(genres, -avg_rating), x = avg_rating)) +
+    xlim(0, 5)
+
+# do users have extreme views of each genre
+user_genre_affinity <- edx2 %>% 
+  group_by(userId, genres) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  filter(avg_rating < 1 | avg_rating > 4.75)
+
+user_genre_affinity %>% ggplot() +
+    geom_raster(aes(y = genres, x = userId, fill = avg_rating)) +
+    scale_fill_distiller(palette = "Spectral")
+
+
 ```
 
-Average rating of each user.  Red represents a user in the extreme group - either very high (5) or very low (<=1).
+Average rating of each user.  Red represents a user who rated all movies the same (sd == 0).
 ```{r}
 # user and rating
 mjb1 <- edx %>% 
@@ -200,9 +215,65 @@ Let's look at the ratings of only these users
 edx %>%
   filter(userId %in% outliers$userId) %>% 
   ggplot() +
-    geom_point(aes(x = as.factor(reorder(userId, rating)), y = rating)) +
-    coord_flip()
+    geom_point(aes(x = as.factor(reorder(userId, rating)), y = rating))
 
 ```
 
+
+# Models
+
+```{r}
+
+#
+# Setup
+#
+edx <- readRDS(file = "./rda/edx.rds")
+small_edx <- sample_n(edx, 10000)
+
+
+set.seed(1)
+test_index <- createDataPartition(y = small_edx$rating, times = 1, p = 0.1, list = FALSE)
+train <- small_edx[-test_index,]
+temp <- small_edx[test_index,]
+
+# Make sure userId and movieId in validation set are also in train set
+validation <- temp %>% 
+  semi_join(train, by = "movieId") %>%
+  semi_join(train, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+train <- rbind(train, removed)
+
+# Learners will develop their algorithms on the edx set
+# For grading, learners will run algorithm on validation set to generate ratings
+# validation <- validation %>% select(-rating)
+
+rm(test_index, temp, removed, edx, small_edx)
+
+#write.csv(train, file="train.csv")
+#write.csv(validation, file="validation.csv")
+
+```
+
+```{r}
+library(rpart)
+
+fit <- train(rating ~ movieId,
+             method="rpart",
+             data=train)
+fit
+
+ggplot(fit, highlight = TRUE)
+
+plot(fit$finalModel, margin=.1)
+text(fit$finalModel, cex=.75)
+
+y_hat <- round(predict(fit, validation, type="raw") / .5) * .5
+
+RMSE(y_hat, validation$rating)
+
+round
+
+```
 
