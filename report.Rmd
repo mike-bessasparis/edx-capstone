@@ -223,20 +223,28 @@ edx %>%
 # Models
 
 ```{r}
-
+library(caret)
 library(tidyverse)
 
 #
-# Setup
+# Setup large dataset
 #
 edx <- readRDS(file = "./rda/edx.rds")
-small_edx <- sample_n(edx, 10000)
-
-
 set.seed(1)
-test_index <- createDataPartition(y = small_edx$rating, times = 1, p = 0.1, list = FALSE)
-train <- small_edx[-test_index,]
-temp <- small_edx[test_index,]
+test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
+train <- edx[-test_index,]
+temp <- edx[test_index,]
+
+#
+# Setup small dataset
+#
+# edx <- readRDS(file = "./rda/edx.rds")
+# set.seed(1)
+# small_edx <- sample_n(edx, 10000)
+# test_index <- createDataPartition(y = small_edx$rating, times = 1, p = 0.1, list = FALSE)
+# train <- small_edx[-test_index,]
+# temp <- small_edx[test_index,]
+
 
 # Make sure userId and movieId in validation set are also in train set
 validation <- temp %>% 
@@ -253,11 +261,13 @@ train <- rbind(train, removed)
 
 rm(test_index, temp, removed, edx, small_edx)
 
+#
+# save small datasets in order to get them from home PC
+#
 #write.csv(train, file="train.csv")
 #write.csv(validation, file="validation.csv")
-
-train <- read.csv("train.csv") %>% select(userId, movieId, rating, timestamp, title, genres)
-validation <- read.csv("validation.csv") %>% select(userId, movieId, rating, timestamp, title, genres)
+#train <- read.csv("train.csv") %>% select(userId, movieId, rating, timestamp, title, genres)
+#validation <- read.csv("validation.csv") %>% select(userId, movieId, rating, timestamp, title, genres)
 
 ```
 
@@ -266,8 +276,8 @@ validation <- read.csv("validation.csv") %>% select(userId, movieId, rating, tim
 library(caret)
 
 # split out genres
-train <- train %>% separate_rows(genres, sep = "\\|")
-validation <- validation %>% separate_rows(genres, sep = "\\|")
+# train <- train %>% separate_rows(genres, sep = "\\|")
+# validation <- validation %>% separate_rows(genres, sep = "\\|")
 
 #
 # Y = mu + b_i + b_u where:
