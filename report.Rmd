@@ -224,6 +224,8 @@ edx %>%
 
 ```{r}
 
+library(tidyverse)
+
 #
 # Setup
 #
@@ -260,22 +262,42 @@ validation <- read.csv("validation.csv") %>% select(userId, movieId, rating, tim
 ```
 
 ```{r}
-library(rpart)
+
+library(caret)
 
 # split out genres
 train <- train %>% separate_rows(genres, sep = "\\|")
 validation <- validation %>% separate_rows(genres, sep = "\\|")
 
-fit <- train(rating ~ userId + genres,
-             method="rpart",
-             data=train)
+#
+# Y = mu + b_i + b_u where:
+#   mu = the average of all movie ratings
+#   b_i = the movie bias, b_i = mu - average rating of this movie
+#   b_u = the user bias, b_u = Y - mu - b_i
 
-fit
+# calculate overall average
+mu <- mean(train$rating)
 
-plot(fit$finalModel, margin=.1)
-text(fit$finalModel, cex=.75)
+prediction <- mu
 
-y_hat <- round(predict(fit, validation, type="raw") / .5) * .5
+# calculate movie bias
+movie_bias <- train %>%
+  group_by(movieId) %>%
+  summarize(b_i = mean(rating - mu))
+
+# calculate user bias
+user_bias <- train %>%
+  left_join(movie_bias, by='movieId') %>%
+  group_by(userId) %>%
+  summarize(b_u = mean(rating - mu - b_i))
+ 
+prediction <- validation %>% 
+ left_join(movie_bias, by='movieId') %>%
+ left_join(user_bias, by='userId') %>%
+ mutate(pred = mu + b_i + b_u) %>%
+ .$pred
+
+y_hat <- prediction
 
 RMSE(y_hat, validation$rating)
 
