@@ -230,7 +230,7 @@ library(tidyverse)
 # Setup large dataset
 #
 edx <- readRDS(file = "./rda/edx.rds")
-set.seed(1)
+#set.seed(1)
 test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
 train <- edx[-test_index,]
 temp <- edx[test_index,]
@@ -274,6 +274,8 @@ rm(test_index, temp, removed, edx, small_edx)
 ```{r}
 
 library(caret)
+library(tidyverse)
+library(lubridate)
 
 # split out genres
 # train <- train %>% separate_rows(genres, sep = "\\|")
@@ -290,26 +292,41 @@ mu <- mean(train$rating)
 
 prediction <- mu
 
+
+#Time bias model to get monthly mu
+t1 <- as_datetime(min(train$timestamp))
+
+t <- train %>% 
+  mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
+  group_by(month) %>% 
+  summarise(monthly_avg_rating = mean(rating))
+
+train <- train %>% 
+   mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
+   left_join(t, by="month")
+
 # calculate movie bias
 movie_bias <- train %>%
   group_by(movieId) %>%
-  summarize(b_i = mean(rating - mu))
+  summarize(b_i = mean(rating - monthly_avg_rating))
 
 # calculate user bias
 user_bias <- train %>%
-  left_join(movie_bias, by='movieId') %>%
+  left_join(movie_bias, by="movieId") %>%
   group_by(userId) %>%
-  summarize(b_u = mean(rating - mu - b_i))
- 
-prediction <- validation %>% 
- left_join(movie_bias, by='movieId') %>%
- left_join(user_bias, by='userId') %>%
- mutate(pred = mu + b_i + b_u) %>%
- .$pred
+  summarize(b_u = mean(rating - monthly_avg_rating - b_i))
 
-y_hat <- prediction
 
-RMSE(y_hat, validation$rating)
+# calculate the predictions 
+predictions <- validation %>% 
+  mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
+  left_join(t, by="month") %>% 
+  left_join(movie_bias, by="movieId") %>%
+  left_join(user_bias, by="userId") %>%
+  mutate(pred = monthly_avg_rating + b_i + b_u) %>%
+  .$pred
+
+RMSE(predictions, validation$rating)
 
 
 ```
