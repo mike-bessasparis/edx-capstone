@@ -159,12 +159,6 @@ edx2 %>% filter(genres == "(no genres listed)")
 # IMDB lists the genre as "Short"
 
 
-#
-# Transform "timestamp" into a datetime object
-#
-edx2 <- edx2 %>% 
-  mutate(timestamp = as_datetime(timestamp))
-
 ```
 
 ***
@@ -216,6 +210,34 @@ edx %>%
   filter(userId %in% outliers$userId) %>% 
   ggplot() +
     geom_point(aes(x = as.factor(reorder(userId, rating)), y = rating))
+
+```
+
+How do rating change over time?
+```{r}
+
+#
+# make a copy of the data to modify so I don't have to rebuild if something goes bad.
+#
+edx2 <- edx
+
+#
+# Transform "timestamp" into a datetime object
+#
+edx2 <- edx2 %>% 
+  mutate(timestamp = as_datetime(timestamp))
+
+edx2 %>% 
+  mutate(time_bin = round_date(as_datetime(timestamp), unit = "month")) %>% 
+  group_by(time_bin) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  ggplot(aes(x = time_bin, y = avg_rating)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    labs(title = "Monthly average movie rating changes over time.") +
+    theme_economist_white()  
+
+
 
 ```
 
@@ -283,24 +305,21 @@ library(lubridate)
 
 #
 # Y = mu + b_i + b_u where:
-#   mu = the average of all movie ratings
-#   b_i = the movie bias, b_i = mu - average rating of this movie
+#   mu = the monthly average of all movie ratings by all users
+#   b_i = the movie bias, b_i = mu - average rating of this movie by all users
 #   b_u = the user bias, b_u = Y - mu - b_i
 
-# calculate overall average
-mu <- mean(train$rating)
 
-prediction <- mu
-
-
-#Time bias model to get monthly mu
+# Time bias model to get mu for each month
 t1 <- as_datetime(min(train$timestamp))
 
+# Calculate monthly average ratings for all movies
 t <- train %>% 
   mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
   group_by(month) %>% 
-  summarise(monthly_avg_rating = mean(rating))
+  summarise(monthly_mu = mean(rating))
 
+# Add to dataset so we can use monthly average in user and item bias
 train <- train %>% 
    mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
    left_join(t, by="month")
@@ -308,13 +327,13 @@ train <- train %>%
 # calculate movie bias
 movie_bias <- train %>%
   group_by(movieId) %>%
-  summarize(b_i = mean(rating - monthly_avg_rating))
+  summarize(b_i = mean(rating - monthly_mu))
 
 # calculate user bias
 user_bias <- train %>%
   left_join(movie_bias, by="movieId") %>%
   group_by(userId) %>%
-  summarize(b_u = mean(rating - monthly_avg_rating - b_i))
+  summarize(b_u = mean(rating - monthly_mu - b_i))
 
 
 # calculate the predictions 
@@ -323,11 +342,26 @@ predictions <- validation %>%
   left_join(t, by="month") %>% 
   left_join(movie_bias, by="movieId") %>%
   left_join(user_bias, by="userId") %>%
-  mutate(pred = monthly_avg_rating + b_i + b_u) %>%
-  .$pred
+  mutate(pred = round((monthly_mu + b_i + b_u) / .5) * .5) %>%
+  mutate(pred = if_else(pred < .5, .5, pred)) %>% 
+  mutate(pred = if_else(pred > 5, 5, pred)) %>% 
+ .$pred
+
+
 
 RMSE(predictions, validation$rating)
 
+
+
+mjb_p <- data.frame(predictions)
+l <- c(".5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
+mjb_p <- mjb_p %>% 
+  mutate(predictions = factor(predictions, levels = l))
+
+mjb_v <- validation %>% 
+  mutate(rating = factor(rating, levels = l))
+
+confusionMatrix(mjb_p$predictions, mjb_v$rating)
 
 ```
 
