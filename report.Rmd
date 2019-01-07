@@ -251,7 +251,7 @@ library(tidyverse)
 #
 # Setup large dataset
 #
-edx <- readRDS(file = "./rda/edx.rds")
+#edx <- readRDS(file = "./rda/edx.rds")
 #set.seed(1)
 test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
 train <- edx[-test_index,]
@@ -349,17 +349,17 @@ predictions <- validation %>%
 
 
 
-RMSE(predictions, validation$rating)
+# RMSE(predictions, validation$rating)
 
 
 
 mjb_p <- data.frame(predictions)
 l <- c(".5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
 mjb_p <- mjb_p %>% 
-  mutate(predictions = factor(predictions, levels = l))
+  mutate(predictions = as.factor(predictions))
 
 mjb_v <- validation %>% 
-  mutate(rating = factor(rating, levels = l))
+  mutate(rating = as.factor(rating))
 
 confusionMatrix(mjb_p$predictions, mjb_v$rating)
 
