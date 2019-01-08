@@ -41,13 +41,13 @@ validation <- temp %>%
 removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
 
+# my stuff !!!!
 saveRDS(edx, file = "./rda/edx.rds")
+saveRDS(validation, file = "./rda/Validation.rds")
 
 # Learners will develop their algorithms on the edx set
 # For grading, learners will run algorithm on validation set to generate ratings
 validation <- validation %>% select(-rating)
-
-saveRDS(validation, file = "./rda/Validation.rds")
 
 # Ratings will go into the CSV submission file below:
 write.csv(validation %>% select(userId, movieId) %>% mutate(rating = NA),

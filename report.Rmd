@@ -336,9 +336,13 @@ calc_rating <- function(mu, b_i, b_u, month) {
                  round(pred),
                  round(pred / 0.5) * 0.5)
 
+  
+  # TODO: consider fewer 1/2 start ratings than whod star ratings
+  
+  
   # recover extreme predictions
-  # pred <- if_else(pred < .5, .5, pred)
-  # pred <- if_else(pred > 5, 5, pred)
+  pred <- if_else(pred < .5, .5, pred)
+  pred <- if_else(pred > 5, 5, pred)
   
   return(pred)
 
