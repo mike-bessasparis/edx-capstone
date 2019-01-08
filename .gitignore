@@ -11,3 +11,6 @@
 .RDataTmp
 .RDataTmp1
 submission.csv
+train.csv
+validation.csv
+train.csv
