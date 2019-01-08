@@ -17,7 +17,7 @@ library(caret)
 edx <- readRDS(file = "./rda/edx.rds")
 validation <- readRDS (file = "./rda/Validation.rds")
 
-small_edx <- sample_n(edx, 1000)
+#small_edx <- sample_n(edx, 1000)
 
 ```
 
@@ -43,11 +43,9 @@ summary(edx$rating)
 edx %>% ggplot(aes(x=rating)) +
   geom_histogram(binwidth = .5, col="grey") +
   scale_x_continuous(breaks = seq(0, 5, .5)) +
+  labs(title = "Notice fewer 1/2 Stars")
   theme_economist_white()
 
-edx %>% ggplot(aes(x=rating)) +
-  geom_histogram(binwidth = 1, col="grey") +
-  theme_economist_white()
 
 
 ```
@@ -213,22 +211,24 @@ edx %>%
 
 ```
 
-How do rating change over time?
+How do ratings change over time?
 ```{r}
 
 #
 # make a copy of the data to modify so I don't have to rebuild if something goes bad.
 #
-edx2 <- edx
-
-#
-# Transform "timestamp" into a datetime object
-#
-edx2 <- edx2 %>% 
+edx2 <- edx %>% 
   mutate(timestamp = as_datetime(timestamp))
 
 edx2 %>% 
-  mutate(time_bin = round_date(as_datetime(timestamp), unit = "month")) %>% 
+  filter(timestamp > ymd("2002-01-01") & 
+         timestamp < ymd("2004-01-01")) %>% 
+  ggplot(aes(x = timestamp, y = rating)) +
+    geom_point() +
+    labs(title = "1/2 star ratings start in 2003")
+
+edx2 %>% 
+  mutate(time_bin = round_date(timestamp, unit = "month")) %>% 
   group_by(time_bin) %>% 
   summarise(avg_rating = mean(rating)) %>% 
   ggplot(aes(x = time_bin, y = avg_rating)) +
@@ -237,51 +237,39 @@ edx2 %>%
     labs(title = "Monthly average movie rating changes over time.") +
     theme_economist_white()  
 
-
-
 ```
 
 
 # Models
 
 ```{r}
-library(caret)
-library(tidyverse)
-
+# library(caret)
+# library(tidyverse)
+# 
 #
 # Setup large dataset
 #
-#edx <- readRDS(file = "./rda/edx.rds")
-#set.seed(1)
-test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
-train <- edx[-test_index,]
-temp <- edx[test_index,]
-
-#
-# Setup small dataset
-#
 # edx <- readRDS(file = "./rda/edx.rds")
 # set.seed(1)
-# small_edx <- sample_n(edx, 10000)
-# test_index <- createDataPartition(y = small_edx$rating, times = 1, p = 0.1, list = FALSE)
-# train <- small_edx[-test_index,]
-# temp <- small_edx[test_index,]
-
-
-# Make sure userId and movieId in validation set are also in train set
-validation <- temp %>% 
-  semi_join(train, by = "movieId") %>%
-  semi_join(train, by = "userId")
-
-# Add rows removed from validation set back into edx set
-removed <- anti_join(temp, validation)
-train <- rbind(train, removed)
-
-# Learners will develop their algorithms on the edx set
-# For grading, learners will run algorithm on validation set to generate ratings
-# validation <- validation %>% select(-rating)
-
-rm(test_index, temp, removed, edx, small_edx)
+# test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
+# train <- edx[-test_index,]
+# temp <- edx[test_index,]
+# 
+# 
+# # Make sure userId and movieId in validation set are also in train set
+# validation <- temp %>%
+#   semi_join(train, by = "movieId") %>%
+#   semi_join(train, by = "userId")
+#  
+# # Add rows removed from validation set back into edx set
+# removed <- anti_join(temp, validation)
+# train <- rbind(train, removed)
+# 
+# # Learners will develop their algorithms on the edx set
+# # For grading, learners will run algorithm on validation set to generate ratings
+# # validation <- validation %>% select(-rating)
+# 
+# rm(test_index, temp, removed, edx, small_edx)
 
 #
 # save small datasets in order to get them from home PC
@@ -299,9 +287,11 @@ library(caret)
 library(tidyverse)
 library(lubridate)
 
-# split out genres
-# train <- train %>% separate_rows(genres, sep = "\\|")
-# validation <- validation %>% separate_rows(genres, sep = "\\|")
+train_set <- edx
+test_set <- validation
+
+rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
+
 
 #
 # Y = mu + b_i + b_u where:
@@ -311,57 +301,65 @@ library(lubridate)
 
 
 # Time bias model to get mu for each month
-t1 <- as_datetime(min(train$timestamp))
+t1 <- as_datetime(min(train_set$timestamp))
 
 # Calculate monthly average ratings for all movies
-t <- train %>% 
+t <- train_set %>% 
   mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
   group_by(month) %>% 
   summarise(monthly_mu = mean(rating))
 
 # Add to dataset so we can use monthly average in user and item bias
-train <- train %>% 
+train_set <- train_set %>% 
    mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
    left_join(t, by="month")
 
 # calculate movie bias
-movie_bias <- train %>%
+movie_bias <- train_set %>%
   group_by(movieId) %>%
   summarize(b_i = mean(rating - monthly_mu))
 
 # calculate user bias
-user_bias <- train %>%
+user_bias <- train_set %>%
   left_join(movie_bias, by="movieId") %>%
   group_by(userId) %>%
   summarize(b_u = mean(rating - monthly_mu - b_i))
 
 
+calc_rating <- function(mu, b_i, b_u, month) {
+  
+  # basic prediction
+  pred <- mu + b_i + b_u
+  
+  # if rated before 2013 then round to whole star, otherwise to 1/2 star
+  pred <- ifelse(month < ymd("2013-01-01"), .5, 5)
+
+  # recover extreme predictions
+  # pred <- if_else(pred < .5, .5, pred)
+  # pred <- if_else(pred > 5, 5, pred)
+  
+  return(pred)
+
+  }
+
+
 # calculate the predictions 
-predictions <- validation %>% 
+predictions <- test_set %>% 
   mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
   left_join(t, by="month") %>% 
   left_join(movie_bias, by="movieId") %>%
   left_join(user_bias, by="userId") %>%
-  mutate(pred = round((monthly_mu + b_i + b_u) / .5) * .5) %>%
-  mutate(pred = if_else(pred < .5, .5, pred)) %>% 
-  mutate(pred = if_else(pred > 5, 5, pred)) %>% 
+  mutate(pred = calc_rating(monthly_mu, b_i, b_u, month)) %>%
  .$pred
 
+# Create confusion matrix
+mjb_p <- data.frame(predictions) %>% 
+    mutate(rating = factor(predictions, levels = rating_levels))
 
+mjb_v <- test_set %>% 
+  mutate(rating = factor(rating, levels = rating_levels))
 
-# RMSE(predictions, validation$rating)
-
-
-
-mjb_p <- data.frame(predictions)
-l <- c(".5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
-mjb_p <- mjb_p %>% 
-  mutate(predictions = as.factor(predictions))
-
-mjb_v <- validation %>% 
-  mutate(rating = as.factor(rating))
-
-confusionMatrix(mjb_p$predictions, mjb_v$rating)
+confusionMatrix(mjb_p$rating, mjb_v$rating)
 
 ```
 
