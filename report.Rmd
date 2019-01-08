@@ -305,13 +305,13 @@ t1 <- as_datetime(min(train_set$timestamp))
 
 # Calculate monthly average ratings for all movies
 t <- train_set %>% 
-  mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
+  mutate(month = round_date(as_datetime(timestamp), unit = "month")) %>% 
   group_by(month) %>% 
   summarise(monthly_mu = mean(rating))
 
 # Add to dataset so we can use monthly average in user and item bias
 train_set <- train_set %>% 
-   mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
+   mutate(month = round_date(as_datetime(timestamp), unit = "month")) %>% 
    left_join(t, by="month")
 
 # calculate movie bias
@@ -332,7 +332,9 @@ calc_rating <- function(mu, b_i, b_u, month) {
   pred <- mu + b_i + b_u
   
   # if rated before 2013 then round to whole star, otherwise to 1/2 star
-  pred <- ifelse(month < ymd("2013-01-01"), .5, 5)
+  pred <- ifelse(month < ymd("2003-01-01"), 
+                 round(pred),
+                 round(pred / 0.5) * 0.5)
 
   # recover extreme predictions
   # pred <- if_else(pred < .5, .5, pred)
@@ -345,7 +347,7 @@ calc_rating <- function(mu, b_i, b_u, month) {
 
 # calculate the predictions 
 predictions <- test_set %>% 
-  mutate(month = as.integer(difftime(as_datetime(timestamp), t1, units = "days") / 30)) %>% 
+  mutate(month = round_date(as_datetime(timestamp), unit = "month")) %>% 
   left_join(t, by="month") %>% 
   left_join(movie_bias, by="movieId") %>%
   left_join(user_bias, by="userId") %>%
