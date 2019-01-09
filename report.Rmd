@@ -14,6 +14,7 @@ library(corrplot)
 library(lubridate)
 library(caret)
 
+
 edx <- readRDS(file = "./rda/edx.rds")
 validation <- readRDS (file = "./rda/Validation.rds")
 
@@ -280,6 +281,40 @@ edx2 %>%
 #validation <- read.csv("validation.csv") %>% select(userId, movieId, rating, timestamp, title, genres)
 
 ```
+
+RecommenderLab
+```{r}
+library(recommenderlab)
+library(tidyverse)
+
+train_set <- sample_n(edx, 1000)
+#test_set <- validation
+
+affinity.matrix<- as(train_set,"realRatingMatrix")
+
+# Creation of the model - U(ser) B(ased) C(ollaborative) F(iltering)
+Rec.model<-Recommender(affinity.matrix, method = "IBCF")
+
+# recommended top 5 items for user user
+#recommended.items.u8 <- predict(Rec.model, affinity.matrix["8",], n=5)
+# to display them
+#as(recommended.items.u8, "list")
+
+
+# Predict list of product which can be recommended to given users	 	
+#to predict affinity to all non-rated items 
+predicted.affinity.u <- predict(Rec.model, affinity.matrix["30",], type="ratings")
+as(predicted.affinity.u, "list")
+# .. and the real affinity for the items obtained from the affinity.matrix
+as(affinity.matrix["30",], "list")
+
+
+
+
+```
+
+
+
 
 ```{r}
 
