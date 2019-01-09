@@ -320,6 +320,7 @@ movie_bias <- train_set %>%
   summarize(b_i = mean(rating - monthly_mu))
 
 # calculate user bias
+# currently whatever is left over 
 user_bias <- train_set %>%
   left_join(movie_bias, by="movieId") %>%
   group_by(userId) %>%
@@ -331,13 +332,13 @@ calc_rating <- function(mu, b_i, b_u, month) {
   # basic prediction
   pred <- mu + b_i + b_u
   
-  # if rated before 2013 then round to whole star, otherwise to 1/2 star
+  # if rated before 2003 then round to whole star
   pred <- ifelse(month < ymd("2003-01-01"), 
                  round(pred),
                  round(pred / 0.5) * 0.5)
 
   
-  # TODO: consider fewer 1/2 start ratings than whod star ratings
+  # TODO: consider fewer 1/2 star ratings than whole star ratings
   
   
   # recover extreme predictions
