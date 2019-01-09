@@ -315,24 +315,18 @@ train_set <- train_set %>%
 # calculate movie bias
 movie_bias <- train_set %>%
   group_by(movieId) %>%
-  summarize(b_i = mean(rating - monthly_mu))
+  summarize(b_i = mean(rating - monthly_mu) )
 
 # calculate user bias
 user_bias <- train_set %>%
-  group_by(userId) %>%
-  summarize(b_u = mean(rating - monthly_mu))
-
-# add unknown bias
-res_bias <- train_set %>% 
   left_join(movie_bias, by="movieId") %>%
-  left_join(user_bias, by="userId") %>%
-  group_by(userId) %>% 
-  summarize(b_res = mean(rating - monthly_mu - b_i - b_u))
+  group_by(userId) %>%
+  summarize(b_u = mean(rating - monthly_mu - b_i))
 
-calc_rating <- function(mu, b_i, b_u, b_res, month) {
+calc_rating <- function(mu, b_i, b_u, month) {
   
   # basic prediction
-  pred <- mu + b_i + b_u + b_res
+  pred <- mu + b_i + b_u
   
   # if rated before 2003 then round to whole star
   pred <- ifelse(month < ymd("2003-01-01"), 
@@ -358,8 +352,7 @@ predictions <- test_set %>%
   left_join(t, by="month") %>% 
   left_join(movie_bias, by="movieId") %>%
   left_join(user_bias, by="userId") %>%
-  left_join(res_bias, by="userId") %>%
-  mutate(pred = calc_rating(monthly_mu, b_i, b_u, b_res, month)) %>%
+  mutate(pred = calc_rating(monthly_mu, b_i, b_u, month)) %>%
  .$pred
 
 # Create confusion matrix
