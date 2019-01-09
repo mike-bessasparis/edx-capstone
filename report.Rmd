@@ -320,12 +320,16 @@ movie_bias <- train_set %>%
   summarize(b_i = mean(rating - monthly_mu))
 
 # calculate user bias
-# currently whatever is left over 
 user_bias <- train_set %>%
-  left_join(movie_bias, by="movieId") %>%
   group_by(userId) %>%
-  summarize(b_u = mean(rating - monthly_mu - b_i))
+  summarize(b_u = mean(rating - monthly_mu))
 
+# add unknown bias
+res_bias <- train_set %>% 
+  left_join(movie_bias, by="movieId") %>%
+  left_join(user_bias, by="userId") %>%
+  group_by(userId) %>% 
+  summarize(b_res = mean(rating - monthly_mu - b_i - b_u))
 
 calc_rating <- function(mu, b_i, b_u, month) {
   
