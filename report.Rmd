@@ -331,12 +331,19 @@ calc_rating <- function(mu, b_i, b_u, month) {
   # if rated before 2003 then round to whole star
   pred <- ifelse(month < ymd("2003-01-01"), 
                  round(pred),
-                 round(pred / 0.5) * 0.5)
+                 pred)
 
+  # Consider fewer 1/2 star ratings than whole star ratings
+  # if pred is "near" to whole star then round to whole star
+  # otherwise round to 1/2 star
+  #pred <- 2.35
+  pred <- ifelse(pred - as.integer(pred) < .1, 
+                 floor(pred), 
+          ifelse(pred - as.integer(pred) > .3,
+                 ceiling(pred),
+          as.integer(pred) + .5 ) )
   
-  # TODO: consider fewer 1/2 star ratings than whole star ratings
-  
-  
+
   # recover extreme predictions
   pred <- if_else(pred < .5, .5, pred)
   pred <- if_else(pred > 5, 5, pred)
@@ -365,4 +372,6 @@ test_set <- test_set %>%
 confusionMatrix(predictions$rating, test_set$rating)
 
 ```
+
+
 
