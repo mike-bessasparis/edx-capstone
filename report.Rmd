@@ -298,8 +298,9 @@ train_set <- edx %>%
   filter(movieId %in% temp$movieId)
 rm(temp)
 
-test_set <- validation
-
+test_set <- validation %>% 
+  mutate(rating = NA)
+  
 r <- as(train_set, "realRatingMatrix")
 #as(train_set[1:10,1:10], "matrix")
 #train_set
@@ -314,12 +315,15 @@ rec.model <- Recommender(data = r,
 # save time by not completing the entire pred matrix
 #
 userId <- as.character(test_set$userId)
-pred <- sapply(userId, function(userId) {
-                          return(predict(rec.model, r[userId], type = "ratings")) } )
+
+v_id <- inner_join(train_set, test_set, by = "userId")
+
+pred <- predict(rec.model, r, type = "ratings")
+
 
 # TODO: get the predicitons out of the sapply list
 # convert from matrix to df to make joins easier
-ibcf_preds <- as(pred[[1]], "matrix") %>% 
+ibcf_preds <- as(pred, "matrix") %>% 
   as.data.frame() %>% 
   rownames_to_column(var = "userId") %>% 
   gather(key = movieId, value = rating, -userId)
