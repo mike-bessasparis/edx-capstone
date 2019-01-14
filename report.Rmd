@@ -15,8 +15,8 @@ library(lubridate)
 library(caret)
 
 
-edx <- readRDS(file = "./rda/small_edx.rds")
-validation <- readRDS (file = "./rda/small_Validation.rds")
+edx <- readRDS(file = "./rda/full_edx.rds")
+validation <- readRDS (file = "./rda/full_Validation.rds")
 
 
 ```
@@ -290,7 +290,7 @@ library(recommenderlab)
 temp <- edx %>% 
   group_by(movieId) %>% 
   summarise(count = n()) %>% 
-#  top_n(1000, wt = count) %>% 
+  top_n(10, wt = count) %>% 
   arrange(-count) %>% 
   mutate(running_total = cumsum(count))
 
@@ -298,15 +298,16 @@ train_set <- edx %>%
   filter(movieId %in% temp$movieId)
 rm(temp)
 
-test_set <- validation %>% 
-  mutate(rating = NA)
-  
+test_set <- validation
+
 r <- as(train_set, "realRatingMatrix")
 #as(train_set[1:10,1:10], "matrix")
-#train_set
+
 rec.model <- Recommender(data = r,
                          method = "IBCF",
                          parameter = list(method = "Cosine"))
+
+#saveRDS(rec.model, file = "./rda/small_IBCF_model.rds")
 
 #getModel(rec.model)$sim
 #image(getModel(rec.model)$sim)
@@ -314,25 +315,28 @@ rec.model <- Recommender(data = r,
 # predict movie ratings only from userId in the test_set
 # save time by not completing the entire pred matrix
 #
-userId <- as.character(test_set$userId)
 
-v_id <- inner_join(train_set, test_set, by = "userId")
+r2 <- train_set %>% 
+  filter(userId %in% test_set$userId) %>% 
+  as("realRatingMatrix")
 
-pred <- predict(rec.model, r, type = "ratings")
+pred <- predict(rec.model, r2, type = "ratings")
 
-
-# TODO: get the predicitons out of the sapply list
 # convert from matrix to df to make joins easier
+# final mutate is a KLUDGE to get the proper userId
 ibcf_preds <- as(pred, "matrix") %>% 
-  as.data.frame() %>% 
+  as.data.frame.matrix() %>% 
   rownames_to_column(var = "userId") %>% 
-  gather(key = movieId, value = rating, -userId)
+  gather(key = movieId, value = rating, -userId) %>% 
+  mutate(userId = substring(userId, 2))
 
 #as(pred, "matrix")
 
 # 
 # Create confusion matrix
 #
+
+# TODO: FIX THIS !!!!  The join isn't correct
 
 round_rating <- function(pred) {
   pred <- round(pred / 0.5) * 0.5
