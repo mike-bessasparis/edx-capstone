@@ -15,9 +15,11 @@ library(lubridate)
 library(caret)
 
 
-edx <- readRDS(file = "./rda/full_edx.rds")
-validation <- readRDS (file = "./rda/full_Validation.rds")
+edx <- readRDS(file = "./rda/small_edx.rds")
+validation <- readRDS (file = "./rda/small_Validation.rds")
 
+#edx <- readRDS(file = "./rda/full_edx.rds")
+#validation <- readRDS (file = "./rda/full_Validation.rds")
 
 ```
 
@@ -290,73 +292,63 @@ library(recommenderlab)
 temp <- edx %>% 
   group_by(movieId) %>% 
   summarise(count = n()) %>% 
-  top_n(10, wt = count) %>% 
+  #top_n(10, wt = count) %>% 
   arrange(-count) %>% 
   mutate(running_total = cumsum(count))
 
+# reduce th size of the file to train
 train_set <- edx %>%
   filter(movieId %in% temp$movieId)
 rm(temp)
 
 test_set <- validation
 
+
+
 r <- as(train_set, "realRatingMatrix")
-#as(train_set[1:10,1:10], "matrix")
 
 rec.model <- Recommender(data = r,
-                         method = "IBCF",
-                         parameter = list(method = "Cosine"))
+                        method = "IBCF",
+                        parameter = list(method = "Cosine"))
 
 #saveRDS(rec.model, file = "./rda/small_IBCF_model.rds")
-
-#getModel(rec.model)$sim
-#image(getModel(rec.model)$sim)
 
 # predict movie ratings only from userId in the test_set
 # save time by not completing the entire pred matrix
 #
+test_set_users <- as.character(unique(test_set$userId))
+pred <- predict(rec.model, r[test_set_users], type = "ratings")
+pred_matrix <- as(pred, "matrix")
 
-r2 <- train_set %>% 
-  filter(userId %in% test_set$userId) %>% 
-  as("realRatingMatrix")
-
-pred <- predict(rec.model, r2, type = "ratings")
-
-# convert from matrix to df to make joins easier
-# final mutate is a KLUDGE to get the proper userId
+# make into a df
 ibcf_preds <- as(pred, "matrix") %>% 
   as.data.frame.matrix() %>% 
   rownames_to_column(var = "userId") %>% 
-  gather(key = movieId, value = rating, -userId) %>% 
-  mutate(userId = substring(userId, 2))
-
-#as(pred, "matrix")
-
-# 
-# Create confusion matrix
-#
-
-# TODO: FIX THIS !!!!  The join isn't correct
+  gather(key = movieId, value = rating, -userId)
 
 round_rating <- function(pred) {
   pred <- round(pred / 0.5) * 0.5
   return(pred)
 }
 
-rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
 ibcf_preds <- ibcf_preds %>% 
     mutate(pred_rating = factor(round_rating(rating), levels = rating_levels)) %>% 
     select(-rating)
 
+# 
+# Create confusion matrix
+#
+# factorize test_set ratings
+rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
 test_set <- test_set %>% 
   mutate(rating = factor(rating, levels = rating_levels),
          userId = as.character(userId),
-         movieId = as.character(movieId))
+         movieId = as.character(movieId)) %>% 
+  select(userId, movieId, rating)
 
-test_set2 <- test_set %>% 
-  left_join(ibcf_preds)
+v <- left_join(test_set, ibcf_preds)
 
-confusionMatrix(test_set2$pred_rating, test_set2$rating)
+confusionMatrix(v$pred_rating, v$rating)
 
 
 ```
