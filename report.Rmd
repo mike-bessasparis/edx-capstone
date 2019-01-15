@@ -293,7 +293,7 @@ library(recommenderlab)
 temp <- edx %>% 
   group_by(movieId) %>% 
   summarise(count = n()) %>% 
-  top_n(10, wt = count) %>% 
+  top_n(1000, wt = count) %>% 
   arrange(-count) %>% 
   mutate(running_total = cumsum(count))
 
@@ -310,7 +310,7 @@ rec.model <- Recommender(data = r,
                         method = "IBCF",
                         parameter = list(method = "Cosine"))
 
-#saveRDS(rec.model, file = "./rda/top10_IBCF_model.rds")
+saveRDS(rec.model, file = "./rda/top1000_IBCF_model.rds")
 
 # predict movie ratings only from userId in the test_set
 # save time by not completing the entire pred matrix
@@ -320,6 +320,7 @@ rec.model <- Recommender(data = r,
 
 pred <- predict(rec.model, r, type = "ratings")
 pred_matrix <- as(pred, "matrix")
+saveRDS(pred_matrix, file = "./rda/top1000_IBCF_pred_matrix.rds")
 
 # make into a df
 ibcf_preds <- as(pred, "matrix") %>% 
