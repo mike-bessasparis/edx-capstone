@@ -21,6 +21,10 @@ validation <- readRDS (file = "./rda/full_Validation.rds")
 edx <- readRDS(file = "./rda/small_edx.rds")
 validation <- readRDS (file = "./rda/small_Validation.rds")
 
+edx <- readRDS(file = "./rda/mini_edx.rds")
+validation <- readRDS (file = "./rda/mini_Validation.rds")
+
+
 rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
 
 
@@ -245,6 +249,39 @@ edx2 %>%
 
 
 # Models
+
+NaiveBayes model
+```{r}
+
+library(tidyverse)
+library(klaR)
+library(caret)
+library(lubridate)
+
+train_set <- edx %>% 
+  mutate(month = round_date(as_datetime(timestamp), unit = "month"),
+         rating = factor(rating, levels = rating_levels) )
+
+test_set <- validation %>% 
+  mutate(month = round_date(as_datetime(timestamp), unit = "month"),
+         rating = factor(rating, levels = rating_levels) )
+
+# set up x-fold cross validation procedure
+train_control <- trainControl(method = "cv", 
+                              number = 5)
+
+fit <- train(rating ~ userId + movieId, method = "nb", data = train_set, trControl = train_control)
+
+naive_bayes_predictions <- predict(fit, test_set, type="raw")
+
+confusionMatrix(naive_bayes_predictions, test_set$rating)
+
+
+
+
+
+```
+
 IBCF
 ```{r}
 library(caret)
@@ -299,6 +336,10 @@ test_set <- test_set %>%
 final_ibcf_predictions <- left_join(test_set, ibcf_preds)
 
 ```
+
+
+
+
 
 RecommenderLab - UBCF
 ```{r}
