@@ -530,6 +530,7 @@ test_set <- validation %>%
 #   mu = the monthly average of all movie ratings by all users
 #   b_i = the movie bias, b_i = mu - average rating of this movie by all users
 #   b_u = the user bias, b_u = Y - mu - b_i
+#
 
 # Calculate monthly average ratings for all movies
 t <- train_set %>% 
@@ -541,20 +542,19 @@ train_set <- train_set %>%
    left_join(t, by="month")
 
 # calculate movie bias
+# lambda manually tuned
+lambda1 <- 10
 movie_bias <- train_set %>%
   group_by(movieId) %>%
-  summarize(b_i = mean(rating - monthly_mu) )
+  summarize(b_i = sum(rating - monthly_mu) / (n() + lambda1) )
 
 # calculate user bias
+# lambda manually tuned
+lambda2 <- 5
 user_bias <- train_set %>%
   left_join(movie_bias) %>%
   group_by(userId) %>%
-  summarize(b_u = mean(rating - monthly_mu - b_i))
-
-  
-
-
-
+  summarize(b_u = sum(rating - monthly_mu) / (n() + lambda2) )
 
 
 calc_rating <- function(mu, b_i, b_u, month) {
@@ -614,9 +614,10 @@ final_custom_predictions <- final_custom_predictions %>%
 test_set <- test_set %>% 
   mutate(rating = factor(rating, levels = rating_levels))
 
-confusionMatrix(final_custom_predictions$custom_pred, test_set$rating)
+q <- confusionMatrix(final_custom_predictions$custom_pred, test_set$rating)$overall["Accuracy"]
 
-rm(final_custom_predictions, movie_bias,t, test_set, train_set, user_bias)
+
+#rm(final_custom_predictions, movie_bias, t, test_set, train_set, user_bias)
 
 ```
 
