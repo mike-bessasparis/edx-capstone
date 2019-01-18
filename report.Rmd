@@ -36,7 +36,6 @@ all_model_predictions <-
 ```{r}
 
 summary(edx)
-
 head(edx)
 
 ```
@@ -528,29 +527,45 @@ test_set <- validation %>%
 #   b_u = the user bias, b_u = Y - mu - b_i
 #
 
-# Calculate monthly average ratings for all movies
-t <- train_set %>% 
-  group_by(month) %>% 
-  summarise(monthly_mu = mean(rating))
+mu <- mean(train_set$rating)
 
-# Add to dataset so we can use monthly average in user and item bias
+#
+# calculate temporal part of item bias, avg rating of item i at time t
+# and add to train_set
+#
+
+# build time buckets
+d1 <- round_date(as_datetime(min(edx$timestamp)), unit = "day")
+d2 <- round_date(as_datetime(max(edx$timestamp)), unit = "day")
+d3 <- interval(d1, d2)
+num_buckets <- ceiling(d3 / dweeks(10))
+time_buckets <- d1 + c(0:num_buckets) * weeks(10)
+
+
+t <- train_set %>% 
+  group_by(movieId, month) %>% 
+  summarise(b_i_time = mean(rating - mu))
+
 train_set <- train_set %>% 
    left_join(t, by="month")
+
 
 # calculate movie bias
 # lambda manually tuned
 lambda1 <- 10
 movie_bias <- train_set %>%
   group_by(movieId) %>%
-  summarize(b_i = sum(rating - monthly_mu) / (n() + lambda1) )
+  summarize(b_i = sum(rating - mu) / (n() + lambda1))
+
+train_set <- train_set %>% 
+  left_join(movie_bias, by = "movieId")
 
 # calculate user bias
 # lambda manually tuned
 lambda2 <- 5
 user_bias <- train_set %>%
-  left_join(movie_bias) %>%
   group_by(userId) %>%
-  summarize(b_u = sum(rating - monthly_mu) / (n() + lambda2) )
+  summarize(b_u = sum(rating - mu) / (n() + lambda2) )
 
 
 calc_rating <- function(mu, b_i, b_u, month) {
@@ -558,7 +573,7 @@ calc_rating <- function(mu, b_i, b_u, month) {
   # basic prediction
   pred <- mu + b_i + b_u
   
-  # if rated before 2003 then round-upwards to whole star
+  # if rated before 2003-05-15 then round-upwards to whole star
   # this produces better accuracy than either round or floor
   pred <- ifelse(month < ymd("2003-05-15"), 
                  ceiling(pred),
@@ -569,7 +584,7 @@ calc_rating <- function(mu, b_i, b_u, month) {
   # if pred is "near" to whole star then round to whole star
   # otherwise round to 1/2 star
   #
-  # rounding thresholds (.4 and .6) optimized by multiple trails
+  # rounding thresholds (.4 and .6) optimized by multiple trials
   #
   pred <- ifelse(pred - as.integer(pred) < .4, 
                  floor(pred), 
@@ -588,14 +603,14 @@ calc_rating <- function(mu, b_i, b_u, month) {
 
 # calculate the predictions 
 final_custom_predictions <- test_set %>% 
-  left_join(t, by="month") %>% 
+#  left_join(t, by="month") %>% 
   left_join(movie_bias, by="movieId") %>%
   left_join(user_bias, by="userId") %>%
-  mutate(custom_pred = calc_rating(monthly_mu, b_i, b_u, month)) %>% 
+  mutate(custom_pred = calc_rating(mu, b_i, b_u, month)) %>% 
   select(userId, movieId, custom_pred)
 
 #
-# add predicitions to ensemble
+# add predictions to ensemble
 #
 all_model_predictions <- all_model_predictions %>% 
     left_join(final_custom_predictions, by = c("userId", "movieId"))
@@ -610,7 +625,11 @@ final_custom_predictions <- final_custom_predictions %>%
 test_set <- test_set %>% 
   mutate(rating = factor(rating, levels = rating_levels))
 
-rm(final_custom_predictions, movie_bias, t, test_set, train_set, user_bias)
+q <- confusionMatrix(final_custom_predictions$custom_pred, 
+                factor(validation$rating, rating_levels))$overall["Accuracy"]
+
+#rm(final_custom_predictions, movie_bias, test_set, train_set, user_bias,
+   lambda1, lambda2, mu, t)
 
 ```
 
