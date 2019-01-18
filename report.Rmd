@@ -3,14 +3,10 @@ title: "Report"
 output: html_notebook
 ---
 
-```{r}
+```{r echo=FALSE, results='hide'}
 
 library(tidyverse)
-library(readr)
 library(ggthemes)
-library(gridExtra)
-library(kableExtra)
-library(corrplot)
 library(lubridate)
 library(caret)
 
@@ -75,7 +71,7 @@ rated_movies_grouped_by_genre <- edx %>%
   separate_rows(genres, sep = "\\|") %>% 
   group_by(genres) 
 
-mjb4 <- nrow(mjb3)
+mjb4 <- nrow(rated_movies_grouped_by_genre)
 
 ```
 In the dataset there are: 
@@ -147,11 +143,11 @@ edx_working <- edx
 #
 # First of all, I would like to see which variables contain missing values.
 #
-NAcol <- which(colSums(is.na(edx_working)) > 0)
+NAcol <- which(colSums(is.na(edx)) > 0)
 
 ```
 
-There are `r length(NAcol)` columns with at least one NA.
+There are `r length(which(colSums(is.na(edx)) > 0))` columns with at least one NA.
 
 ```{r}
 
@@ -328,7 +324,7 @@ edx2 %>%
          timestamp < ymd("2004-01-01")) %>% 
   ggplot(aes(x = timestamp, y = rating)) +
     geom_point() +
-    labs(title = "1/2 star ratings start in 2003")
+    labs(title = "1/2 star ratings start on 2003-05-15")
 
 edx2 %>% 
   mutate(time_bin = round_date(timestamp, unit = "month")) %>% 
@@ -564,7 +560,7 @@ calc_rating <- function(mu, b_i, b_u, month) {
   
   # if rated before 2003 then round-upwards to whole star
   # this produces better accuracy than either round or floor
-  pred <- ifelse(month < ymd("2003-01-01"), 
+  pred <- ifelse(month < ymd("2003-05-15"), 
                  ceiling(pred),
                  pred)
 
@@ -573,11 +569,11 @@ calc_rating <- function(mu, b_i, b_u, month) {
   # if pred is "near" to whole star then round to whole star
   # otherwise round to 1/2 star
   #
-  # rounding thresholds (.4 and .7) optimized by multiple trails
+  # rounding thresholds (.4 and .6) optimized by multiple trails
   #
   pred <- ifelse(pred - as.integer(pred) < .4, 
                  floor(pred), 
-          ifelse(pred - as.integer(pred) > .7,
+          ifelse(pred - as.integer(pred) > .6,
                  ceiling(pred),
           as.integer(pred) + .5 ) )
   
@@ -614,10 +610,7 @@ final_custom_predictions <- final_custom_predictions %>%
 test_set <- test_set %>% 
   mutate(rating = factor(rating, levels = rating_levels))
 
-q <- confusionMatrix(final_custom_predictions$custom_pred, test_set$rating)$overall["Accuracy"]
-
-
-#rm(final_custom_predictions, movie_bias, t, test_set, train_set, user_bias)
+rm(final_custom_predictions, movie_bias, t, test_set, train_set, user_bias)
 
 ```
 
