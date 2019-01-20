@@ -27,7 +27,7 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))
 movielens <- left_join(ratings, movies, by = "movieId")
 
 # !!! MY STUFF to make a small set for testing
-movielens <- movielens %>% sample_n(10000)
+movielens <- movielens %>% sample_n(1000)
 
 # Validation set will be 10% of MovieLens data
 set.seed(1)
