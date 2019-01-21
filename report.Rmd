@@ -560,6 +560,15 @@ get_bin <- function(d) {
 
 get_bin(ymd("2003-06-01"))
 
+
+# build b_i_time matrix
+#
+b_i_time_matrix <- matrix(nrow = length(unique(train_set$movieId)), ncol = num_bins)
+rownames(b_i_time_matrix) <- unique(train_set$movieId)
+colnames(b_i_time_matrix) <- c(1:num_bins)
+b_i_time_matrix[,] <- 0
+
+
 #
 # find avg for each movie, bin
 #
@@ -571,33 +580,24 @@ movie_time_bias <- train_set %>%
   group_by(movieId, time_bin) %>% 
   summarise(b_i_time = mean(rating - mu))
 
+for(i in 1:nrow(movie_time_bias)) {
+    row <- movie_time_bias[i,]
+    r <- row$movieId
+    c <- row$time_bin
+    b_i_time_matrix[r, c] <- row$b_i_time
+}
+
 
 #
 # lookup to find a b_i_time
 #
 get_b_i_time <- function(m, b) {
   bias <- 0
-  for (j in seq(1, length(m))) {
-    m2 <- movie_time_bias %>% 
-            filter(movieId == m[j] & time_bin == b[j])
-    if_else(nrow(m2) != 0, 
-            bias[j] <- m2$b_i_time,
-            bias[j] <- 0)
+  for (j in 1:length(m)) {
+    bias[j] <- b_i_time_matrix[m, b]
   }
   return(bias)
 }
-
-get_b_i_time(1, 13)
-get_b_i_time(c(1, 1), c(2, 3))
-
-
-q <- movie_time_bias %>% 
-  filter(movieId == 1 & time_bin == 13)
-nrow(q)
-
-
-
-
 
 
 # calculate base movie bias = avg rating of the movie
@@ -607,8 +607,6 @@ movie_bias <- train_set %>%
   group_by(movieId) %>%
   summarize(b_i = sum(rating - mu) / (n() + lambda1))
 
-#train_set <- train_set %>% 
-#  left_join(movie_bias, by = "movieId")
 
 # calculate user bias
 # lambda manually tuned
@@ -617,15 +615,12 @@ user_bias <- train_set %>%
   group_by(userId) %>%
   summarize(b_u = sum(rating - mu) / (n() + lambda2) )
 
-#train_set <- train_set %>% 
-#  left_join(user_bias, by = "userId")
-
-
-calc_rating <- function(mu, b_i, b_i_time, b_u, month) {
+calc_rating <- function(movieId, time_bin, mu, b_i, b_u, month) {
   
   # basic prediction
-  pred <- mu + b_i + b_i_time + b_u
-  
+  pred <- mu + b_i + b_u
+#  pred <- mu + b_i + b_i_time_matrix[movieId, time_bin] + b_u
+
   # if rated before 2003-05-15 then round-upwards to whole star
   # this produces better accuracy than either round or floor
   pred <- ifelse(month < ymd("2003-05-15"), 
@@ -656,11 +651,10 @@ calc_rating <- function(mu, b_i, b_i_time, b_u, month) {
 # calculate the predictions 
 final_custom_predictions <- test_set %>% 
   mutate(time_bin = get_bin(month)) %>% 
-  mutate(b_i_time = get_b_i_time(movieId, time_bin))
   left_join(movie_bias, by="movieId") %>%
   left_join(user_bias, by="userId") %>%
-  mutate(custom_pred = calc_rating(mu, b_i, b_i_time, b_u, month)) #%>% 
-#  select(userId, movieId, custom_pred)
+  mutate(custom_pred = calc_rating(movieId, time_bin, mu, b_i, b_u, month)) %>% 
+  select(userId, movieId, custom_pred)
 
 #
 # add predictions to ensemble
@@ -682,7 +676,7 @@ q <- confusionMatrix(final_custom_predictions$custom_pred,
                 factor(validation$rating, rating_levels))$overall["Accuracy"]
 
 #rm(final_custom_predictions, movie_bias, test_set, train_set, user_bias,
-   lambda1, lambda2, mu, t)
+#   lambda1, lambda2, mu, t)
 
 ```
 
