@@ -542,8 +542,8 @@ mu <- mean(train_set$rating)
 d1 <- round_date(as_datetime(min(train_set$timestamp)), unit = "day")
 d2 <- round_date(as_datetime(max(train_set$timestamp)), unit = "day")
 d3 <- interval(d1, d2)
-num_bins <- ceiling(d3 / dyears(1))
-b <- d1 + c(0:num_bins) * years(1)
+num_bins <- ceiling(d3 / dweeks(10))
+b <- d1 + c(0:num_bins) * weeks(10)
 t_bins <- data.frame(binId = seq(1, num_bins), 
                   start = b[1:num_bins], 
                   end = b[2:(num_bins + 1)])
@@ -558,7 +558,7 @@ get_bin <- function(d) {
   return(bin)
 }
 
-get_bin(ymd("2003-06-01"))
+#get_bin(ymd("2003-06-01"))
 
 
 # build b_i_time matrix
@@ -618,8 +618,8 @@ user_bias <- train_set %>%
 calc_rating <- function(movieId, time_bin, mu, b_i, b_u, month) {
   
   # basic prediction
-  pred <- mu + b_i + b_u
-#  pred <- mu + b_i + b_i_time_matrix[movieId, time_bin] + b_u
+#  pred <- mu + b_i + b_u
+  pred <- mu + b_i + b_i_time_matrix[movieId, time_bin] + b_u
 
   # if rated before 2003-05-15 then round-upwards to whole star
   # this produces better accuracy than either round or floor
@@ -627,19 +627,20 @@ calc_rating <- function(movieId, time_bin, mu, b_i, b_u, month) {
                  ceiling(pred),
                  pred)
 
+  # Accruracy is better with sconsidering this  
   #
   # Consider fewer 1/2 star ratings than whole star ratings
   # if pred is "near" to whole star then round to whole star
   # otherwise round to 1/2 star
   #
   # rounding thresholds (.4 and .6) optimized by multiple trials
-  #
-  pred <- ifelse(pred - as.integer(pred) < .4, 
-                 floor(pred), 
-          ifelse(pred - as.integer(pred) > .6,
-                 ceiling(pred),
-          as.integer(pred) + .5 ) )
-  
+# 
+#   pred <- ifelse(pred - as.integer(pred) < .5,
+#                  floor(pred),
+#           ifelse(pred - as.integer(pred) > .5,
+#                  ceiling(pred),
+#           as.integer(pred) + .5 ) )
+
   # recover extreme predictions
   pred <- if_else(pred < .5, .5, pred)
   pred <- if_else(pred > 5, 5, pred)
