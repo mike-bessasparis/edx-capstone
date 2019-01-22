@@ -1,0 +1,327 @@
+---
+title: "Report - Exploratory Data Analysis"
+output: html_notebook
+---
+
+```{r echo=FALSE, results='hide'}
+
+library(tidyverse)
+library(ggthemes)
+library(lubridate)
+
+edx <- readRDS(file = "./rda/full_edx.rds")
+validation <- readRDS (file = "./rda/full_Validation.rds")
+
+#edx <- readRDS(file = "./rda/small_edx.rds")
+#validation <- readRDS (file = "./rda/small_Validation.rds")
+
+rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
+
+```
+
+***
+# Explore variables
+```{r}
+
+summary(edx)
+head(edx)
+
+```
+
+## Response Variable: Rating
+```{r}
+
+summary(edx$rating)
+
+```
+
+```{r}
+
+edx %>% ggplot(aes(x=rating)) +
+  geom_histogram(binwidth = .5, col="grey") +
+  scale_x_continuous(breaks = seq(0, 5, .5)) +
+  labs(title = "Notice fewer 1/2 Stars, WHY????") +
+  theme_economist_white()
+
+
+
+```
+## Other interesting variables
+```{r}
+
+#Find number of unique movies rated, number of unique users, and number of movies in each genre.
+
+mjb1 <- length(unique(edx$movieId))
+mjb2 <- length(unique(edx$userId))
+
+rated_movies_grouped_by_genre <- edx %>% 
+  separate_rows(genres, sep = "\\|") %>% 
+  group_by(genres) 
+
+mjb4 <- nrow(rated_movies_grouped_by_genre)
+
+```
+In the dataset there are: 
+
+- `r mjb2` unique users
+- `r mjb1` unique movies rated
+- `r mjb4` unique movie genres
+
+Number of reviewed movies in each genre.  Note that a movie may be tagged with several genres, e.g., the movie "Boomerang" is classified as both a "Comedy" and a "Romance."
+```{r}
+
+edx %>% 
+  separate_rows(genres, sep = "\\|") %>% 
+  group_by(genres) %>% 
+  summarise(count = n()) %>% 
+  ggplot() +
+    geom_col(aes(x = reorder(genres, -count), y = count)) +
+    coord_flip() +
+    xlab("Genre") +
+    ylab("Number of Movies") +
+    theme_economist_white() +
+    theme(axis.text.y.left = element_text(hjust = 1),
+          panel.grid.major = element_blank(),
+          axis.ticks.y.left = element_line(),
+          axis.ticks.x.bottom = element_blank())
+
+```
+
+Which movies did not have a genre listed? 
+```{r}
+
+edx %>% filter(genres == "(no genres listed)")
+
+```
+
+
+What are the top 10 most reviewed movies?
+```{r}
+
+edx %>% 
+  group_by(title) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count) %>% 
+  top_n(10)
+
+```
+Who are the top 10 active reviewers?
+```{r}
+
+edx %>% 
+  group_by(userId) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count) %>% 
+  top_n(10)
+
+```
+***
+# Relationships (part 1)
+## Numeric Correlations with Rating
+No continuous numeric predictors to correlate with Rating; userId and movieId are discrete while timestamp is a date.
+
+*** 
+# Missing data, label encoding, and factorizing variables
+```{r}
+#
+# make a copy of the data to modify so I don't have to rebuild if something goes bad.
+#
+edx_working <- edx
+
+#
+# First of all, I would like to see which variables contain missing values.
+#
+NAcol <- which(colSums(is.na(edx)) > 0)
+
+```
+
+There are `r length(which(colSums(is.na(edx)) > 0))` columns with at least one NA.
+
+```{r}
+
+# # Label encoding
+# # There are no labels that are ordinal and should be encoded as a number.
+# 
+# #
+# # Separate and factorize the genres
+# #
+# edx_working <- edx_working %>% 
+#   separate_rows(genres, sep = "\\|") %>% 
+#   mutate(genre = factor(genres))
+# 
+# #
+# # Create a month-year from the timestamp
+# #
+# edx_working <- edx_working %>% 
+#   mutate(month = round_date(as_datetime(timestamp), unit = "month"),
+#          bimonth = round_date(as_datetime(timestamp), unit = "bimonth"),
+#          qtr = round_date(as_datetime(timestamp), unit = "quarter"),
+#          season = round_date(as_datetime(timestamp), unit = "season"),
+#          year = round_date(as_datetime(timestamp), unit = "year"))
+# 
+# #
+# # Factorizing the rating
+# #
+# # edx2 <- edx2 %>% 
+# #   mutate(rating = factor(rating))
+# 
+# edx_working %>% filter(genres == "(no genres listed)")
+# # "Pull My Daisy (1958)" by Kerouac
+# # IMDB lists the genre as "Short"
+
+
+```
+
+***
+# Relationships (part 2)
+Movie Genre and rating - is there a genre bias?
+```{r eval=FALSE}
+
+library(tidyverse)
+
+edx <- readRDS(file = "./rda/full_edx.rds")
+edx_working <- edx
+
+# combined genre and rating
+edx_working %>% 
+  group_by(genres) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  ggplot() +
+    geom_point(aes(x = reorder(genres, avg_rating), y = avg_rating)) +
+    coord_flip()
+
+# individual genre and rating
+edx_working %>% 
+  separate_rows(genres, sep = "\\|") %>% 
+  group_by(genres) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  ggplot() +
+    geom_point(aes(x = reorder(genres, avg_rating), y = avg_rating)) +
+    coord_flip() +
+    ylim(c(0, 5))
+
+```
+Yes, there is a small genre-bias overall.
+
+ANOVA
+```{r eval=FALSE}
+library(tidyverse)
+
+rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
+
+edx <- readRDS(file = "./rda/small_edx.rds")
+edx_working <- edx %>% 
+  mutate(rating = factor(rating, rating_levels))
+
+summary(aov(rating ~ userId + movieId, data = edx_working))
+
+```
+
+
+
+How are users, genres, and ratings related?  Do different users have a different genre-bias?
+
+```{r}
+
+library(tidyverse)
+
+edx <- readRDS(file = "./rda/small_edx.rds")
+edx_working <- edx
+
+# combined genre and rating
+edx_working %>% 
+  group_by(genres) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  ggplot() +
+    geom_point(aes(x = reorder(genres, avg_rating), y = avg_rating)) +
+    coord_flip()
+
+```
+
+``` {r}
+
+
+#
+# Separate and factorize the genres
+#
+edx_working <- edx_working %>% 
+  separate_rows(genres, sep = "\\|") %>% 
+  mutate(genre = factor(genres))
+
+edx_working %>% 
+  ggplot() +
+    geom_density(aes(x = rating, col = genre))
+
+
+
+# edx_working %>% 
+#   ggplot() +
+#     geom_point(aes(y der(genres, -avg_rating), x = avg_rating)) +
+#     xlim(0, 5)
+
+# do users have extreme views of each genre
+user_genre_affinity <- edx2 %>% 
+  group_by(userId, genres) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  filter(avg_rating < 1 | avg_rating > 4.75)
+
+user_genre_affinity %>% ggplot() +
+    geom_raster(aes(y = genres, x = userId, fill = avg_rating)) +
+    scale_fill_distiller(palette = "Spectral")
+
+
+```
+
+Average rating of each user.  Red represents a user who rated all movies the same (sd == 0).
+```{r}
+# user and rating
+mjb1 <- edx %>% 
+  group_by(userId) %>% 
+  summarise(avg_rating = mean(rating), std_dev = sd(rating))%>% 
+  arrange(-avg_rating)
+
+outliers <- mjb1 %>% 
+  filter(std_dev == 0)
+
+ggplot() +
+  geom_point(data = mjb1, aes(x = userId, y = avg_rating), color = "grey") +
+  geom_point(data = outliers, aes(x = userId, y = avg_rating), color = "red")  
+
+```
+Let's look at the ratings of only these users
+```{r}
+
+edx %>%
+  filter(userId %in% outliers$userId) %>% 
+  ggplot() +
+    geom_point(aes(x = as.factor(reorder(userId, rating)), y = rating))
+
+```
+
+How do ratings change over time?
+```{r}
+
+#
+# make a copy of the data to modify so I don't have to rebuild if something goes bad.
+#
+edx2 <- edx %>% 
+  mutate(timestamp = as_datetime(timestamp))
+
+edx2 %>% 
+  filter(timestamp > ymd("2002-01-01") & 
+         timestamp < ymd("2004-01-01")) %>% 
+  ggplot(aes(x = timestamp, y = rating)) +
+    geom_point() +
+    labs(title = "1/2 star ratings start on 2003-05-15")
+
+edx2 %>% 
+  mutate(time_bin = round_date(timestamp, unit = "month")) %>% 
+  group_by(time_bin) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  ggplot(aes(x = time_bin, y = avg_rating)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    labs(title = "Monthly average movie rating changes over time.") +
+    theme_economist_white()  
+
+```
