@@ -517,16 +517,16 @@ library(lubridate)
 train_set <- edx %>% 
   mutate(userId = as.character(userId),
          movieId = as.character(movieId),
-         month = round_date(as_datetime(timestamp), unit = "month"))
+         rating_date = round_date(as_datetime(timestamp), unit = "day"))
 
 test_set <- validation %>%  
   mutate(userId = as.character(userId),
          movieId = as.character(movieId),
-         month = round_date(as_datetime(timestamp), unit = "month"))
+         rating_date = round_date(as_datetime(timestamp), unit = "day"))
 
 #
 # Y = mu + b_i + b_u where:
-#   mu = the monthly average of all movie ratings by all users
+#   mu = the average of all movie ratings by all users
 #   b_i = the movie bias, b_i = mu - average rating of this movie by all users
 #   b_u = the user bias, b_u = Y - mu - b_i
 #
@@ -549,20 +549,24 @@ t_bins <- data.frame(binId = seq(1, num_bins),
                   end = b[2:(num_bins + 1)])
 
 #
-# TODO: make this faster !!!
+# Assume t_bins is sorted by ascending end date
+# loop thru t_bins until d < end_date, then break
 #
 get_bin <- function(d) {
   bin <- 0
   for (j in seq(1, length(d))) {
     for (i in seq(1, nrow(t_bins))) {
-      if (d[j] %within% interval(t_bins$start[i], t_bins$end[i])) { bin[j] <- i }
+#      if (d[j] %within% interval(t_bins$start[i], t_bins$end[i])) { 
+      if (d[j] < t_bins$end[i]) { 
+        bin[j] <- i
+        break
+      }
     }
   }
   return(bin)
 }
 
 #get_bin(ymd("2003-06-01"))
-
 
 # build b_i_time matrix
 #
@@ -571,12 +575,11 @@ rownames(b_i_time_matrix) <- unique(train_set$movieId)
 colnames(b_i_time_matrix) <- c(1:num_bins)
 b_i_time_matrix[,] <- 0
 
-
 #
 # find avg for each movie, bin
 #
 train_set <- train_set %>% 
-  mutate(time_bin = get_bin(month))
+  mutate(time_bin = get_bin(rating_date))
 
 # calc known b_i_time = the avg rating for each movie during each time bin
 movie_time_bias <- train_set %>% 
@@ -618,7 +621,7 @@ user_bias <- train_set %>%
   group_by(userId) %>%
   summarize(b_u = sum(rating - mu) / (n() + lambda2) )
 
-calc_rating <- function(movieId, time_bin, mu, b_i, b_u, month) {
+calc_rating <- function(movieId, time_bin, mu, b_i, b_u, rating_date) {
   
   # basic prediction
 #  pred <- mu + b_i + b_u
@@ -626,7 +629,7 @@ calc_rating <- function(movieId, time_bin, mu, b_i, b_u, month) {
 
   # if rated before 2003-05-15 then round-upwards to whole star
   # this produces better accuracy than either round or floor
-  pred <- ifelse(month < ymd("2003-05-15"), 
+  pred <- ifelse(rating_date < ymd("2003-05-15"), 
                  ceiling(pred),
                  pred)
 
@@ -654,10 +657,10 @@ calc_rating <- function(movieId, time_bin, mu, b_i, b_u, month) {
 
 # calculate the predictions 
 final_custom_predictions <- test_set %>% 
-  mutate(time_bin = get_bin(month)) %>% 
+  mutate(time_bin = get_bin(rating_date)) %>% 
   left_join(movie_bias, by="movieId") %>%
   left_join(user_bias, by="userId") %>%
-  mutate(custom_pred = calc_rating(movieId, time_bin, mu, b_i, b_u, month)) %>% 
+  mutate(custom_pred = calc_rating(movieId, time_bin, mu, b_i, b_u, rating_date)) %>% 
   select(userId, movieId, custom_pred)
 
 #
