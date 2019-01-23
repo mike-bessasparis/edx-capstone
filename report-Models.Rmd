@@ -190,32 +190,22 @@ mu <- mean(train_set$rating)
 #
 
 # build time bins
-d1 <- round_date(as_datetime(min(train_set$timestamp)), unit = "day")
-d2 <- round_date(as_datetime(max(train_set$timestamp)), unit = "day")
-d3 <- interval(d1, d2)
-num_bins <- ceiling(d3 / dweeks(10))
-b <- d1 + c(0:num_bins) * weeks(10)
+first_rating_ts <- min(train_set$timestamp)
+last_rating_ts <- max(train_set$timestamp)
+d3 <- last_rating_ts - first_rating_ts
+bin_size <- as.double(dweeks(1))
+num_bins <- ceiling(d3 / bin_size)
+
+# visualize bins
+b <- first_rating_ts + c(0:num_bins) * bin_size
 t_bins <- data.frame(binId = seq(1, num_bins), 
                   start = b[1:num_bins], 
                   end = b[2:(num_bins + 1)])
-
-rm(d1, d2, d3, b)
-gc()
-
+t_bins_mjb <- as_datetime(t_bins$start)
 
 # Get the time bin this rating date falls into
-# Assume t_bins is sorted by ascending end date
-# Loop thru t_bins until d < end_date, then break
 get_bin <- function(d) {
-  bin <- 0
-  for (j in seq(1, length(d))) {
-    for (i in seq(1, nrow(t_bins))) {
-      if (d[j] < t_bins$end[i]) { 
-        bin[j] <- i
-        break
-      }
-    }
-  }
+  bin <- ceiling((d - first_rating_ts) / bin_size)
   return(bin)
 }
 
@@ -231,7 +221,7 @@ b_i_time_matrix[,] <- 0
 
 # get the time bin for each rating_date
 train_set <- train_set %>% 
-  mutate(time_bin = get_bin(rating_date))
+  mutate(time_bin = get_bin(timestamp))
 
 # calc b_i_time = the avg rating for each movie during each time bin
 movie_time_bias <- train_set %>% 
@@ -301,6 +291,8 @@ calc_rating <- function(movieId, time_bin, mu, b_i, b_u, rating_date) {
 #                  ceiling(pred),
 #           as.integer(pred) + .5 ) )
 
+  # !!!! TODO  Reconsider ilo RMSE !!!!
+  # !!!!
   # recover extreme predictions
   pred <- if_else(pred < .5, .5, pred)
   pred <- if_else(pred > 5, 5, pred)
@@ -314,7 +306,7 @@ calc_rating <- function(movieId, time_bin, mu, b_i, b_u, rating_date) {
 # calculate the predictions 
 #
 final_custom_predictions <- test_set %>% 
-  mutate(time_bin = get_bin(rating_date)) %>% 
+  mutate(time_bin = get_bin(timestamp)) %>% 
   left_join(movie_bias, by="movieId") %>%
   left_join(user_bias, by="userId") %>%
   mutate(custom_pred = calc_rating(movieId, time_bin, mu, b_i, b_u, rating_date)) %>% 
