@@ -9,8 +9,8 @@ output:
 
 library(tidyverse)
 
-#edx <- readRDS(file = "./rda/full_edx.rds")
-#validation <- readRDS (file = "./rda/full_Validation.rds")
+# edx <- readRDS(file = "./rda/full_edx.rds")
+# validation <- readRDS (file = "./rda/full_Validation.rds")
 
 edx <- readRDS(file = "./rda/small_edx.rds")
 validation <- readRDS (file = "./rda/small_Validation.rds")
@@ -24,61 +24,55 @@ all_model_predictions <-
          movieId = as.character(movieId)) %>% 
   select(userId, movieId, rating)
 
+RMSE <- function(true_ratings, predicted_ratings){
+    sqrt(mean((true_ratings - predicted_ratings)^2))
+  }
 
 ```
 
 
 # Models
 
-## NaiveBayes model
-Using formula rating ~ userId + MovieId + month.  
-Tried adding genre but didn't add to accuracy but took much longer to build model.
-```{r eval=FALSE}
+## Random Forest
 
-library(tidyverse)
+```{r}
+
 library(caret)
-library(lubridate)
-
-edx <- readRDS(file = "./rda/small_edx.rds")
-validation <- readRDS (file = "./rda/small_Validation.rds")
-
-rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
+library(tidyverse)
 
 train_set <- edx %>% 
-  mutate(month = as.character(round_date(as_datetime(timestamp), unit = "month")),
-         rating = factor(rating, levels = rating_levels))
+  mutate(userId = as.character(userId),
+         movieId = as.character(movieId),
+         rating_date = round_date(as_datetime(timestamp), unit = "day"))
 
-test_set <- validation %>% 
-  mutate(month = as.character(round_date(as_datetime(timestamp), unit = "month")),
-         rating = factor(rating, levels = rating_levels))
+test_set <- validation %>%  
+  mutate(userId = as.character(userId),
+         movieId = as.character(movieId),
+         rating_date = round_date(as_datetime(timestamp), unit = "day"))
 
-fit <- train(rating ~ userId + movieId + month, 
-             method = "naive_bayes", 
-             data = train_set)
+library(randomForest)
+fit <- randomForest(rating ~ movieId, data = train_set) 
+plot(fit)
 
-naive_bayes_predictions <- predict(fit, test_set, type = "raw")
+q <- predict(fit, test_set)
 
-final_nb_predictions <- 
-  data.frame(userId = as.character(validation$userId),
-             movieId = as.character(validation$movieId),
-             nb_preds = naive_bayes_predictions,
-             stringsAsFactors = FALSE)
+final_rf_predictions <- data.frame(userId = test_set$userId, movieId = test_set$movieId, rf_pred = q)
 
-confusionMatrix(final_nb_predictions$nb_preds, test_set$rating)
+RMSE_RandomForest <- RMSE(test_set$rating, q)
 
 #
-# add predicitions to ensemble
+# add predictions to ensemble
 #
-final_nb_predictions <- final_nb_predictions %>% 
-  mutate(nb_preds = as.double(nb_preds))
-
 all_model_predictions <- all_model_predictions %>% 
-    left_join(final_nb_predictions, by = c("userId", "movieId"))
+    left_join(final_rf_predictions, by = c("userId", "movieId"))
 
 
-rm(train_set, test_set, fit, naive_bayes_predictions, final_nb_predictions)
+fit2 <- train(rating ~ movieId,
+      method = "Rborist",
+      data = train_set)
 
 ```
+
 
 ## IBCF
 ```{r eval=FALSE}
@@ -87,24 +81,22 @@ library(caret)
 library(tidyverse)
 library(recommenderlab)
 
-edx <- readRDS(file = "./rda/small_edx.rds")
-validation <- readRDS (file = "./rda/small_Validation.rds")
+# can't afford to run on entire dataset.  just use the top_n number of rated movies.
+temp <- edx %>%
+  group_by(movieId) %>%
+  summarise(count = n()) %>%
+  top_n(100, wt = count) %>%
+  arrange(-count) %>%
+  mutate(running_total = cumsum(count))
 
-rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
+train_set <- semi_join(edx, temp, by = "movieId")
 
-# can't afford to run on entire dataset.  just use the top_n rated movies.
-# temp <- edx %>% 
-#   group_by(movieId) %>% 
-#   summarise(count = n()) %>% 
-# #  top_n(1000, wt = count) %>% 
-#   arrange(-count) %>% 
-#   mutate(running_total = cumsum(count))
 
 #
 # reduce the size of the training set to only those items in the validation set
 # no reason to use resources to predict ratings on non-requested items
 #
-train_set <- edx %>%
+train_set <- train_set %>%
   filter(movieId %in% unique(validation$movieId))
 
 test_set <- validation
@@ -117,7 +109,7 @@ rec.model <- Recommender(data = r,
 pred <- predict(rec.model, r, type = "ratings")
 pred_matrix <- as(pred, "matrix")
 
-# make into a df
+# make into a df to visualize and join easier than a matrix
 ibcf_preds <- pred_matrix %>% 
   as.data.frame.matrix() %>% 
   rownames_to_column(var = "userId") %>% 
@@ -128,7 +120,10 @@ test_set <- test_set %>%
         movieId = as.character(movieId)) %>% 
  select(userId, movieId)
 
+# Join the predictions to the test_set
 final_ibcf_predictions <- left_join(test_set, ibcf_preds)
+
+RMSE_IBCF <- RMSE(validation$rating, final_ibcf_predictions$IBCF_rating)
 
 #
 # add predictions to ensemble
@@ -136,7 +131,7 @@ final_ibcf_predictions <- left_join(test_set, ibcf_preds)
 all_model_predictions <- all_model_predictions %>% 
     left_join(final_ibcf_predictions, by = c("userId", "movieId"))
 
-rm(train_set, test_set, rec.model, pred, pred_matrix, r, ibcf_preds, final_ibcf_predictions)
+#rm(train_set, test_set, rec.model, pred, pred_matrix, r, ibcf_preds, final_ibcf_predictions)
 
 ```
 
@@ -167,9 +162,6 @@ library(caret)
 library(tidyverse)
 library(lubridate)
 
-#edx <- readRDS(file = "./rda/small_edx.rds")
-#validation <- readRDS (file = "./rda/small_Validation.rds")
-
 train_set <- edx %>% 
   mutate(userId = as.character(userId),
          movieId = as.character(movieId),
@@ -188,6 +180,7 @@ mu <- mean(train_set$rating)
 #
 
 # build time bins
+# bin_size tuned to 2 to give best RMSE
 first_rating_ts <- min(train_set$timestamp)
 last_rating_ts <- max(train_set$timestamp)
 d3 <- last_rating_ts - first_rating_ts
@@ -243,27 +236,28 @@ get_b_i_time <- function(m, b) {
 
 
 # calculate base movie bias = avg rating of the movie
-# lambda manually tuned
-lambda1 <- 10
+# lambda manually tuned (9)
+lambda1 <- 9
 movie_bias <- train_set %>%
   group_by(movieId) %>%
   summarize(b_i = sum(rating - mu) / (n() + lambda1))
 
-
 # calculate user bias
-# lambda manually tuned
-lambda2 <- 5
+# lambda manually tuned (3)
+lambda2 <- 3
 user_bias <- train_set %>%
   group_by(userId) %>%
   summarize(b_u = sum(rating - mu) / (n() + lambda2) )
+
+
 
 calc_rating <- function(movieId, time_bin, mu, b_i, b_u, rating_date) {
   
   # base prediction
   pred <- mu + b_i + b_i_time_matrix[movieId, time_bin] + b_u
+#  pred <- mu + b_i + b_u
 
-  # if rated before 2003-05-15 then round-upwards to whole star
-  # this produces better accuracy than either round or floor
+  # if rated before 2003-05-15 then round to whole star
   pred <- ifelse(rating_date < ymd("2003-05-15"), 
                  round(pred),
                  pred)
@@ -283,7 +277,7 @@ calc_rating <- function(movieId, time_bin, mu, b_i, b_u, rating_date) {
 #           as.integer(pred) + .5 ) )
 
   # recover extreme predictions
-  pred <- if_else(pred < .5, .5, pred)
+  pred <- if_else(pred < .5, 1, pred)
   pred <- if_else(pred > 5, 5, pred)
   
   return(pred)
@@ -305,7 +299,7 @@ final_custom_predictions <- test_set %>%
 all_model_predictions <- all_model_predictions %>% 
     left_join(final_custom_predictions, by = c("userId", "movieId"))
 
-RMSE <- RMSE(final_custom_predictions$custom_pred, validation$rating)
+RMSE_custom <- RMSE(validation$rating, final_custom_predictions$custom_pred)
 
 rm(final_custom_predictions, movie_bias, test_set, train_set, user_bias)
 rm(lambda1, lambda2, mu)
@@ -317,20 +311,20 @@ gc()
 
 
 ## Ensemble Evaluation
-```{r eval=FALSE}
+```{r}
 
 library(tidyverse)
 library(caret)
+
+all_model_predictions <- all_model_predictions %>% 
+  select(userId, movieId, rating, custom_pred, rf_pred)
 
 mjb <- all_model_predictions %>% 
   select(-userId, -movieId, -rating) %>% 
   as.matrix()
 
-rating_levels <- c("0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5")
-all_model_predictions$ensemble_pred <- round(rowMeans(mjb, na.rm = TRUE) / 0.5) * 0.5
+all_model_predictions$ensemble_pred <- rowMeans(mjb, na.rm = TRUE)
 
-confusionMatrix(factor(all_model_predictions$ensemble_pred, rating_levels), 
-                factor(validation$rating, rating_levels))
+Ensemble_RMSE <- RMSE(validation$rating, all_model_predictions$ensemble_pred)
 
 ```
-
