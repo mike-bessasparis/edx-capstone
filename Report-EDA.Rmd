@@ -105,16 +105,47 @@ edx %>%
   top_n(10)
 
 ```
-Who are the top 10 active reviewers?
+Number of movies rated by each user (user_support)
 ```{r}
 
-edx %>% 
+library(lubridate)
+library(tidyverse)
+
+q <- edx %>% 
+  mutate(userId = factor(userId)) %>% 
   group_by(userId) %>% 
-  summarise(count = n()) %>% 
-  arrange(-count) %>% 
-  top_n(10)
+  summarise(num_of_movies_rated = n())
+
+q %>% ggplot() +
+  geom_col(aes(x = userId, y = num_of_movies_rated)) +
+  labs(title = "There is a difference between users", x = "UserId") +
+  scale_x_discrete(labels = NULL) +
+  coord_cartesian(ylim = c(0, 1500)) +
+  theme_economist_white()
+  
+```
+
+Are different movies rated by different number of users?  (movie_support)
+```{r}
+library(lubridate)
+library(tidyverse)
+
+q <- edx %>% 
+  mutate(movieId = factor(userId)) %>% 
+  group_by(movieId) %>% 
+  summarise(num_of_users_rating_movie = n())
+
+q %>% ggplot() +
+  geom_col(aes(x = movieId, y = num_of_users_rating_movie)) +
+  labs(title = "There is a difference between movies") +
+  scale_x_discrete(labels = NULL) +
+  coord_cartesian(ylim = c(0, 2500)) +
+  theme_economist_white()
+  
 
 ```
+
+
 ***
 # Relationships (part 1)
 ## Numeric Correlations with Rating
@@ -221,7 +252,7 @@ summary(aov(rating ~ userId + movieId, data = edx_working))
 
 How are users, genres, and ratings related?  Do different users have a different genre-bias?
 
-```{r}
+```{r eval=FALSE}
 
 library(tidyverse)
 
@@ -238,7 +269,7 @@ edx_working %>%
 
 ```
 
-``` {r}
+```{r eval=FALSE}
 
 
 #
@@ -325,3 +356,115 @@ edx2 %>%
     theme_economist_white()  
 
 ```
+
+
+Do individual movies' ratings change over time?
+```{r}
+
+library(tidyverse)
+library(lubridate)
+
+edx2 <- edx %>% 
+  mutate(movieId = factor(movieId))
+
+q <- edx2 %>% 
+  group_by(movieId) %>% 
+  summarise(num_ratings = n()) %>% 
+  top_n(10)
+
+edx2 %>% 
+  filter(movieId %in% q$movieId) %>% 
+  mutate(time_bin = round_date(as_datetime(timestamp), unit = "quarter")) %>% 
+  group_by(movieId, time_bin) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  ggplot() +
+    geom_line(aes(x = time_bin, y = avg_rating, col = movieId)) +
+    labs(title = "Change in movie ratings over time", subtitle = "Top 10 most rated movies, quarterly average") +
+    xlab(NULL) +
+    ylab("Rating") +
+    theme_economist_white() +
+    theme(legend.position="none")
+
+```
+
+Do individual users' ratings change over time?
+```{r}
+
+library(tidyverse)
+library(lubridate)
+
+edx2 <- edx %>% 
+  mutate(userId = factor(userId))
+
+q <- edx2 %>% 
+  group_by(userId) %>% 
+  summarise(num_ratings = n()) %>% 
+  top_n(10)
+
+edx2 %>% 
+  filter(userId %in% q$userId) %>% 
+  mutate(time_bin = round_date(as_datetime(timestamp), unit = "quarter")) %>% 
+  group_by(userId, time_bin) %>% 
+  summarise(avg_rating = mean(rating)) %>% 
+  ggplot() +
+    geom_line(aes(x = time_bin, y = avg_rating, col = userId)) +
+    labs(title = "Change in user ratings over time", subtitle = "Top 10 most active users, quarterly average") +
+    xlab(NULL) +
+    ylab("Average Rating") +
+    theme_economist_white() +
+    theme(legend.position="none")
+
+```
+
+
+Is there a relationship between volume of ratings and rating of a movie?
+```{r}
+
+library(lubridate)
+library(tidyverse)
+library(corrplot)
+
+q <- edx %>% 
+  mutate(movieId = factor(userId)) %>% 
+  group_by(movieId) %>% 
+  summarise(num_of_users_rating_movie = n(), avg_rating = mean(rating))
+
+cor(q$num_of_users_rating_movie, q$avg_rating)
+
+q %>% ggplot() +
+  geom_point(aes(x = num_of_users_rating_movie, y = avg_rating)) +
+  theme_economist_white()
+
+```
+Not really, correlation = `r cor(q$num_of_users_rating_movie, q$avg_rating)`
+
+
+
+
+Is there a relationship between the number of movies a user rates and that users ratings?
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+edx2 <- edx %>% 
+  mutate(userId = factor(userId))
+
+q <- edx2 %>% 
+  group_by(userId) %>% 
+  summarise(num_ratings = n(), avg_rating = mean(rating))
+
+cor(q$num_ratings, q$avg_rating)
+
+q %>% ggplot() +
+  geom_point(aes(x = num_ratings, y = avg_rating)) +
+  theme_economist_white()
+
+
+```
+
+
+
+
+Is there a relationship between the length of time a user has been rating and that users ratings?

@@ -24,7 +24,7 @@ all_model_predictions <-
          movieId = as.character(movieId)) %>% 
   select(userId, movieId, rating)
 
-RMSE <- function(true_ratings, predicted_ratings){
+RMSE <- function(true_ratings, predicted_ratings) {
     sqrt(mean((true_ratings - predicted_ratings)^2))
   }
 
@@ -33,12 +33,63 @@ RMSE <- function(true_ratings, predicted_ratings){
 
 # Models
 
+## GBM
+```{r}
+
+library(caret)
+library(tidyverse)
+library(lubridate)
+
+train_set <- edx #%>% 
+  # mutate(userId = as.character(userId),
+  #        movieId = as.character(movieId),
+  #        rating_date = round_date(as_datetime(timestamp), unit = "day"))
+
+test_set <- validation #%>%  
+  # mutate(userId = as.character(userId),
+  #        movieId = as.character(movieId),
+  #        rating_date = round_date(as_datetime(timestamp), unit = "day"))
+
+fitControl <- trainControl(method = "cv", number = 2)
+
+gbmGrid <- expand.grid(n.trees = 4920,
+                       interaction.depth = 1,
+                       shrinkage = 0.01,
+                       n.minobsinnode = 11)
+
+start <- Sys.time()
+
+fit <- train(rating ~ userId + movieId + timestamp,
+             data = train_set,
+             method = "gbm",
+             tuneGrid = gbmGrid,
+             trControl = fitControl)
+
+end <-Sys.time()
+mjb <- end - start
+
+q <- predict(fit, test_set)
+
+final_gbm_predictions <- data.frame(userId = as.character(test_set$userId), movieId = as.character(test_set$movieId), gbm_pred = q)
+
+RMSE_gbm <- RMSE(test_set$rating, q)
+
+#
+# add predictions to ensemble
+#
+all_model_predictions <- all_model_predictions %>% 
+    left_join(final_gbm_predictions, by = c("userId", "movieId"))
+
+```
+
+
 ## Random Forest
 
 ```{r}
 
 library(caret)
 library(tidyverse)
+library(lubridate)
 
 train_set <- edx %>% 
   mutate(userId = as.character(userId),
@@ -50,9 +101,10 @@ test_set <- validation %>%
          movieId = as.character(movieId),
          rating_date = round_date(as_datetime(timestamp), unit = "day"))
 
-library(randomForest)
-fit <- randomForest(rating ~ movieId, data = train_set) 
-plot(fit)
+fit <- train(rating ~ movieId,
+             nTree = 10,
+             method = "Rborist",
+             data = train_set)
 
 q <- predict(fit, test_set)
 
@@ -67,9 +119,6 @@ all_model_predictions <- all_model_predictions %>%
     left_join(final_rf_predictions, by = c("userId", "movieId"))
 
 
-fit2 <- train(rating ~ movieId,
-      method = "Rborist",
-      data = train_set)
 
 ```
 
