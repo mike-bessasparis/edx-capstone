@@ -33,7 +33,7 @@ RMSE <- function(true_ratings, predicted_ratings) {
 
 # Models
 
-## GBM
+## XGBoost
 ```{r}
 
 library(caret)
@@ -61,26 +61,26 @@ start <- Sys.time()
 
 fit <- train(rating ~ userId + movieId + timestamp,
              data = train_set,
-             method = "gbm",
-             tuneGrid = gbmGrid,
-             trControl = fitControl)
+             method = "xgbTree")
 
 end <-Sys.time()
 mjb <- end - start
 
 q <- predict(fit, test_set)
 
-final_gbm_predictions <- data.frame(userId = as.character(test_set$userId), movieId = as.character(test_set$movieId), gbm_pred = q)
+final_xgb_predictions <- data.frame(userId = as.character(test_set$userId), movieId = as.character(test_set$movieId), xgb_pred = q)
 
-RMSE_gbm <- RMSE(test_set$rating, q)
+RMSE_xgb <- RMSE(test_set$rating, q)
 
 #
 # add predictions to ensemble
 #
 all_model_predictions <- all_model_predictions %>% 
-    left_join(final_gbm_predictions, by = c("userId", "movieId"))
+    left_join(final_xgb_predictions, by = c("userId", "movieId"))
 
 ```
+
+
 
 
 ## Random Forest
