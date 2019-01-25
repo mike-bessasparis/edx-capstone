@@ -91,24 +91,17 @@ library(caret)
 library(tidyverse)
 library(lubridate)
 
-train_set <- edx %>% 
-  mutate(userId = as.character(userId),
-         movieId = as.character(movieId),
-         rating_date = round_date(as_datetime(timestamp), unit = "day"))
+train_set <- edx 
+test_set <- validation 
 
-test_set <- validation %>%  
-  mutate(userId = as.character(userId),
-         movieId = as.character(movieId),
-         rating_date = round_date(as_datetime(timestamp), unit = "day"))
-
-fit <- train(rating ~ movieId,
+fit <- train(rating ~ movieId + userId + timestamp,
              nTree = 10,
              method = "Rborist",
              data = train_set)
 
 q <- predict(fit, test_set)
 
-final_rf_predictions <- data.frame(userId = test_set$userId, movieId = test_set$movieId, rf_pred = q)
+final_rf_predictions <- data.frame(userId = as.character(test_set$userId), movieId = as.character(test_set$movieId), rf_pred = q)
 
 RMSE_RandomForest <- RMSE(test_set$rating, q)
 
