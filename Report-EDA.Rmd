@@ -464,7 +464,27 @@ q %>% ggplot() +
 
 ```
 
+Is there a relationship between the length of time a user has been rating and that user's ratings?
+
+```{r}
+
+library(tidyverse)
+library(lubridate)
+
+edx2 <- edx %>% 
+  mutate(userId = as.character(userId))
+
+q <- edx2 %>% 
+  group_by(userId) %>% 
+  summarise(first_rating = min(timestamp))
+
+edx2 <- edx2 %>% 
+  left_join(q)
+
+edx2 <- edx2 %>% 
+  mutate(days_since_first_rating = timestamp - first_rating)
 
 
+```
 
-Is there a relationship between the length of time a user has been rating and that users ratings?
+
