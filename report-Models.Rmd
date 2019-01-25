@@ -50,18 +50,23 @@ test_set <- validation #%>%
   #        movieId = as.character(movieId),
   #        rating_date = round_date(as_datetime(timestamp), unit = "day"))
 
-fitControl <- trainControl(method = "cv", number = 2)
+fitControl <- trainControl(method = "cv", number = 10)
 
-gbmGrid <- expand.grid(n.trees = 4920,
-                       interaction.depth = 1,
-                       shrinkage = 0.01,
-                       n.minobsinnode = 11)
+xgbGrid <- expand.grid(gamma = 0,
+                       min_child_weight = 1,
+                       nrounds = 50,
+                       max_depth = 3,
+                       eta = 0.4,
+                       colsample_bytree = 0.8,
+                       subsample = 1)
 
 start <- Sys.time()
 
 fit <- train(rating ~ userId + movieId + timestamp,
              data = train_set,
-             method = "xgbTree")
+             method = "xgbTree",
+             trControl = fitControl,
+             tuneGrid = xgbGrid)
 
 end <-Sys.time()
 mjb <- end - start
@@ -359,7 +364,7 @@ library(tidyverse)
 library(caret)
 
 all_model_predictions <- all_model_predictions %>% 
-  select(userId, movieId, rating, custom_pred, rf_pred)
+  select(userId, movieId, rating, custom_pred, xgb_pred)
 
 mjb <- all_model_predictions %>% 
   select(-userId, -movieId, -rating) %>% 
