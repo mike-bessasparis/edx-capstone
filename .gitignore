@@ -15,3 +15,4 @@ validation.csv
 train-tiny.csv
 report_files
 *.pdf
+submission.csv

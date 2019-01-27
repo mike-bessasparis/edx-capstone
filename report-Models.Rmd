@@ -40,9 +40,13 @@ library(caret)
 library(tidyverse)
 library(lubridate)
 
-train_set <- edx 
+train_set <- edx %>% 
+  mutate(userId = as.factor(userId),
+         movieId = as.factor(movieId))
 
-test_set <- validation
+test_set <- validation %>% 
+  mutate(userId = as.factor(userId),
+         movieId = as.factor(movieId))
 
 q <- train_set %>% 
   group_by(userId) %>% 
@@ -54,7 +58,6 @@ train_set <- train_set %>%
 train_set <- train_set %>% 
   mutate(days_since_first_rating = timestamp - first_rating)
 
-
 q <- test_set %>% 
   group_by(userId) %>% 
   summarise(first_rating = min(timestamp))
@@ -64,11 +67,6 @@ test_set <- test_set %>%
 
 test_set <- test_set %>% 
   mutate(days_since_first_rating = timestamp - first_rating)
-
-
-
-
-
 
 fitControl <- trainControl(method = "cv", number = 10)
 
@@ -82,10 +80,10 @@ xgbGrid <- expand.grid(gamma = 0,
 
 start <- Sys.time()
 
-fit <- train(rating ~ userId + movieId + timestamp + days_since_first_rating,
+fit <- train(rating ~ userId + movieId + timestamp,
              data = train_set,
              method = "xgbTree",
-#             tuneGrid = xgbGrid,
+             tuneGrid = xgbGrid,
              trControl = fitControl)
 
 end <-Sys.time()
