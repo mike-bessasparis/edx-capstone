@@ -38,11 +38,11 @@ rm(edx, validation)
 ```{r}
 library(lubridate)
 
-# create a rated_month feature
-# train_set <- train_set %>% 
-#   mutate(rated_month = round_date(as_datetime(timestamp), unit = "years"))
-# test_set <- test_set %>% 
-#   mutate(rated_month = round_date(as_datetime(timestamp), unit = "years"))
+# create a rated_year feature
+train_set <- train_set %>%
+  mutate(rated_year = as.integer(year(as_datetime(timestamp))))
+test_set <- test_set %>%
+  mutate(rated_year = as.integer(year(as_datetime(timestamp))))
 
 
 ```
@@ -52,34 +52,34 @@ library(lubridate)
 ## Custom Model (Netflix)
 ```{r}
 
-# r = mu + b_i + b_u
+# r = mu + b_i(t) + b_u
 
 # find the overall average rating
 mu <- mean(train_set$rating)
 
-# find the rating bias for each movie
-lambda1 <- 9
-movie_avgs <- train_set %>% 
-  group_by(movieId) %>% 
-  summarize(b_i = sum(rating - mu) / (n() + lambda1))
+# find b_i(t), the rating bias for each movie as a function of time (year)
+lambda1 <- 3
+movie_time_bias <- train_set %>% 
+  group_by(movieId, rated_year) %>% 
+  summarize(b_i_time = sum(rating - mu) / (n() + lambda1))
 
 # find the rating bias for each user
 # (the "leftover" after finding b_i)
-lambda2 <- 3
+lambda2 <- 5
 user_avgs <- train_set %>% 
-  left_join(movie_avgs, by = c("movieId")) %>% 
+  left_join(movie_time_bias, by = c("movieId", "rated_year")) %>% 
   group_by(userId) %>% 
-  summarize(b_u = sum(rating - mu - b_i) / (n() + lambda2) )
+  summarize(b_u = sum(rating - mu - b_i_time) / (n() + lambda2) )
 
 # combine and make predictions
 predicted_ratings <- test_set %>% 
-  left_join(movie_avgs, by = c("movieId")) %>% 
+  left_join(movie_time_bias, by = c("movieId", "rated_year")) %>% 
+  mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
   left_join(user_avgs, by = "userId") %>% 
-  mutate(pred = mu + b_i + b_u) %>% 
-  .$pred
+  mutate(pred = mu + b_i_time + b_u)
 
 
-q <- RMSE(test_set$rating, predicted_ratings)
+q <- RMSE(test_set$rating, predicted_ratings$pred)
 
 
 ```
