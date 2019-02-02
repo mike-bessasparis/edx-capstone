@@ -42,8 +42,8 @@ removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
 
 # my stuff !!!!
-saveRDS(edx, file = "./rda/edx.rds")
-saveRDS(validation, file = "./rda/Validation.rds")
+saveRDS(edx, file = "./rda/full_edx.rds")
+saveRDS(validation, file = "./rda/full_Validation.rds")
 
 # Learners will develop their algorithms on the edx set
 # For grading, learners will run algorithm on validation set to generate ratings

@@ -40,33 +40,39 @@ library(caret)
 library(tidyverse)
 library(lubridate)
 
-train_set <- edx %>% 
-  mutate(userId = as.factor(userId),
-         movieId = as.factor(movieId))
+# train_set <- edx %>% 
+#   mutate(userId = as.factor(userId),
+#          movieId = as.factor(movieId))
+
+train_set <- feature_eng %>% 
+   mutate(userId = as.factor(userId),
+          movieId = as.factor(movieId)) %>% 
+  select(-rating_date, -time_bin, -t_u)
+
 
 test_set <- validation %>% 
   mutate(userId = as.factor(userId),
          movieId = as.factor(movieId))
 
-q <- train_set %>% 
-  group_by(userId) %>% 
-  summarise(first_rating = min(timestamp))
-
-train_set <- train_set %>% 
-  left_join(q)
-
-train_set <- train_set %>% 
-  mutate(days_since_first_rating = timestamp - first_rating)
-
-q <- test_set %>% 
-  group_by(userId) %>% 
-  summarise(first_rating = min(timestamp))
-
-test_set <- test_set %>% 
-  left_join(q)
-
-test_set <- test_set %>% 
-  mutate(days_since_first_rating = timestamp - first_rating)
+# q <- train_set %>% 
+#   group_by(userId) %>% 
+#   summarise(first_rating = min(timestamp))
+# 
+# train_set <- train_set %>% 
+#   left_join(q)
+# 
+# train_set <- train_set %>% 
+#   mutate(days_since_first_rating = timestamp - first_rating)
+# 
+# q <- test_set %>% 
+#   group_by(userId) %>% 
+#   summarise(first_rating = min(timestamp))
+# 
+# test_set <- test_set %>% 
+#   left_join(q)
+# 
+# test_set <- test_set %>% 
+#   mutate(days_since_first_rating = timestamp - first_rating)
 
 fitControl <- trainControl(method = "cv", number = 10)
 
@@ -80,7 +86,7 @@ xgbGrid <- expand.grid(gamma = 0,
 
 start <- Sys.time()
 
-fit <- train(rating ~ userId + movieId + timestamp,
+fit <- train(rating ~ .,
              data = train_set,
              method = "xgbTree",
              tuneGrid = xgbGrid,
@@ -91,9 +97,11 @@ mjb <- end - start
 
 q <- predict(fit, test_set)
 
-final_xgb_predictions <- data.frame(userId = as.character(test_set$userId), movieId = as.character(test_set$movieId), xgb_pred = q)
+final_xgb_predictions <- data.frame(userId = as.character(test_set$userId), 
+                                    movieId = as.character(test_set$movieId), 
+                                    xgb_pred = q)
 
-RMSE_xgb <- RMSE(test_set$rating, q)
+RMSE_xgb <- RMSE(test_set$rating, final_xgb_predictions$xgb_pred)
 
 #
 # add predictions to ensemble
@@ -147,15 +155,16 @@ library(tidyverse)
 library(recommenderlab)
 
 # can't afford to run on entire dataset.  just use the top_n number of rated movies.
-temp <- edx %>%
-  group_by(movieId) %>%
-  summarise(count = n()) %>%
-  top_n(100, wt = count) %>%
-  arrange(-count) %>%
-  mutate(running_total = cumsum(count))
+# temp <- edx %>%
+#   group_by(movieId) %>%
+#   summarise(count = n()) %>%
+#   top_n(100, wt = count) %>%
+#   arrange(-count) %>%
+#   mutate(running_total = cumsum(count))
+# 
+# train_set <- semi_join(edx, temp, by = "movieId")
 
-train_set <- semi_join(edx, temp, by = "movieId")
-
+train_set <- edx
 
 #
 # reduce the size of the training set to only those items in the validation set
@@ -169,7 +178,7 @@ test_set <- validation
 r <- as(train_set, "realRatingMatrix")
 rec.model <- Recommender(data = r,
                         method = "IBCF",
-                        parameter = list(method = "Cosine"))
+                        parameter = list(method = "Pearson"))
 
 pred <- predict(rec.model, r, type = "ratings")
 pred_matrix <- as(pred, "matrix")
@@ -230,15 +239,32 @@ library(lubridate)
 train_set <- edx %>% 
   mutate(userId = as.character(userId),
          movieId = as.character(movieId),
-         rating_date = round_date(as_datetime(timestamp), unit = "day"))
+         rating_date = round_date(as_datetime(timestamp), unit = "day")) %>% 
+  select(-title, -genres)
 
 test_set <- validation %>%  
   mutate(userId = as.character(userId),
          movieId = as.character(movieId),
-         rating_date = round_date(as_datetime(timestamp), unit = "day"))
+         rating_date = round_date(as_datetime(timestamp), unit = "day")) %>% 
+  select(-title, -genres)
 
 mu <- mean(train_set$rating)
 
+################################
+#
+# calculate the user's mean rating date for use in
+# dev_u(t) = sign(t - t_u) * |t - t_u| ^ beta, drift of a user's ratings over time
+#
+
+q <- train_set %>% 
+  group_by(userId) %>% 
+  summarize(t_u = as_date(mean(timestamp) / 86400)) # 86400 = seconds in a day (fast way to truncate timestamp)
+
+t_u <- q %>% 
+  select(userId, t_u)
+  
+
+#################################
 #
 # calculate temporal part of item bias, avg rating of item i at time t
 # and add to train_set
@@ -289,7 +315,7 @@ rm(movie_time_bias, row, c, r, i)
 gc()
 
 #
-# lookup to find a b_i_time
+# lookup function to find a b_i_time
 #
 get_b_i_time <- function(m, b) {
   bias <- 0
@@ -300,6 +326,8 @@ get_b_i_time <- function(m, b) {
 }
 
 
+##############################################
+#
 # calculate base movie bias = avg rating of the movie
 # lambda manually tuned (9)
 lambda1 <- 9
@@ -315,17 +343,22 @@ user_bias <- train_set %>%
   summarize(b_u = sum(rating - mu) / (n() + lambda2) )
 
 
-
-calc_rating <- function(movieId, time_bin, mu, b_i, b_u, rating_date) {
+#############################################
+#
+# function to calculate rating
+#
+calc_rating <- function(movieId, time_bin, mu, b_i, b_u, dev_u_t, rating_date, alpha) {
   
   # base prediction
-  pred <- mu + b_i + b_i_time_matrix[movieId, time_bin] + b_u
-#  pred <- mu + b_i + b_u
+  pred <- mu + b_i + b_i_time_matrix[movieId, time_bin] + b_u + alpha * dev_u_t
 
+  # accuracy is better without this
+  # but its somehow enabling the matrix lookup in this function call to work
+  # so I changed the date to make it moot
   # if rated before 2003-05-15 then round to whole star
-  pred <- ifelse(rating_date < ymd("2003-05-15"), 
-                 round(pred),
-                 pred)
+  pred <- ifelse(rating_date < ymd("1900-05-15"), 
+                round(pred),
+                pred)
 
   # Accruracy is better without considering this  
   #
@@ -349,28 +382,50 @@ calc_rating <- function(movieId, time_bin, mu, b_i, b_u, rating_date) {
 
 }
 
-
+##################################
 #
 # calculate the predictions 
 #
+beta <- 0.23 # parameter for dev_u_t
+alpha <- -0.0046
+
 final_custom_predictions <- test_set %>% 
   mutate(time_bin = get_bin(timestamp)) %>% 
   left_join(movie_bias, by="movieId") %>%
-  left_join(user_bias, by="userId") %>%
-  mutate(custom_pred = calc_rating(movieId, time_bin, mu, b_i, b_u, rating_date)) %>% 
-  select(userId, movieId, custom_pred)
-
-# add predictions to ensemble
-all_model_predictions <- all_model_predictions %>% 
-    left_join(final_custom_predictions, by = c("userId", "movieId"))
+  left_join(user_bias, by="userId") %>% 
+  left_join(t_u, by = "userId") %>% 
+  mutate(dev_u_t = as.integer(sign(difftime(rating_date, t_u))) * 
+                               abs(as.numeric(difftime(rating_date, t_u, units = "days"))) ^ beta) %>% 
+  mutate(custom_pred = calc_rating(movieId, time_bin, mu, b_i, b_u, dev_u_t, rating_date, alpha)) %>% 
+  mutate(res = rating - custom_pred)
 
 RMSE_custom <- RMSE(validation$rating, final_custom_predictions$custom_pred)
 
-rm(final_custom_predictions, movie_bias, test_set, train_set, user_bias)
-rm(lambda1, lambda2, mu)
-rm(b_i_time_matrix, t_bins, num_bins, rating_levels)
-rm(calc_rating, get_b_i_time, get_bin)
-gc()
+
+
+feature_eng <- train_set %>% 
+  mutate(time_bin = get_bin(timestamp)) %>% 
+  left_join(movie_bias, by="movieId") %>%
+  left_join(user_bias, by="userId") %>% 
+  left_join(t_u, by = "userId") %>% 
+  mutate(dev_u_t = as.integer(sign(difftime(rating_date, t_u))) * 
+                               abs(as.numeric(difftime(rating_date, t_u, units = "days"))) ^ beta)
+
+
+
+
+##################################
+#
+# add predictions to ensemble
+#
+all_model_predictions <- all_model_predictions %>% 
+    left_join(final_custom_predictions, by = c("userId", "movieId"))
+
+#rm(final_custom_predictions, movie_bias, test_set, train_set, user_bias)
+#rm(lambda1, lambda2, mu)
+#rm(b_i_time_matrix, t_bins, num_bins, rating_levels)
+#rm(calc_rating, get_b_i_time, get_bin)
+#gc()
 
 ```
 
@@ -381,11 +436,13 @@ gc()
 library(tidyverse)
 library(caret)
 
+saveRDS(all_model_predictions, file = "./rda/mjb.rds")
+
 all_model_predictions <- all_model_predictions %>% 
-  select(userId, movieId, rating, custom_pred, xgb_pred)
+  select(userId, movieId, rating.x, custom_pred, xgb_pred)
 
 mjb <- all_model_predictions %>% 
-  select(-userId, -movieId, -rating) %>% 
+  select(-userId, -movieId, -rating.x) %>% 
   as.matrix()
 
 all_model_predictions$ensemble_pred <- rowMeans(mjb, na.rm = TRUE)
