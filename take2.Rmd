@@ -30,7 +30,24 @@ RMSE <- function(true_ratings, predicted_ratings) {
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
 
+rm(edx, validation)
+
 ```
+
+## Feature Engineering
+```{r}
+library(lubridate)
+
+# create a rated_month feature
+# train_set <- train_set %>% 
+#   mutate(rated_month = round_date(as_datetime(timestamp), unit = "years"))
+# test_set <- test_set %>% 
+#   mutate(rated_month = round_date(as_datetime(timestamp), unit = "years"))
+
+
+```
+
+
 
 ## Custom Model (Netflix)
 ```{r}
@@ -41,20 +58,22 @@ RMSE <- function(true_ratings, predicted_ratings) {
 mu <- mean(train_set$rating)
 
 # find the rating bias for each movie
+lambda1 <- 9
 movie_avgs <- train_set %>% 
   group_by(movieId) %>% 
-  summarise(b_i = mean(rating - mu))
+  summarize(b_i = sum(rating - mu) / (n() + lambda1))
 
 # find the rating bias for each user
 # (the "leftover" after finding b_i)
+lambda2 <- 3
 user_avgs <- train_set %>% 
-  left_join(movie_avgs, by = "movieId") %>% 
+  left_join(movie_avgs, by = c("movieId")) %>% 
   group_by(userId) %>% 
-  summarise(b_u = mean(rating - mu - b_i))
+  summarize(b_u = sum(rating - mu - b_i) / (n() + lambda2) )
 
 # combine and make predictions
 predicted_ratings <- test_set %>% 
-  left_join(movie_avgs, by = "movieId") %>% 
+  left_join(movie_avgs, by = c("movieId")) %>% 
   left_join(user_avgs, by = "userId") %>% 
   mutate(pred = mu + b_i + b_u) %>% 
   .$pred
