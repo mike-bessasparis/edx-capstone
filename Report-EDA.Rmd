@@ -9,9 +9,9 @@ library(tidyverse)
 library(ggthemes)
 library(lubridate)
 
-edx <- data.table::fread("./data/train.csv")
+#edx <- data.table::fread("./data/train.csv")
 
-# edx <- readRDS(file = "./rda/full_edx.rds")
+ edx <- readRDS(file = "./rda/full_edx.rds")
 # validation <- readRDS (file = "./rda/full_Validation.rds")
 
 #edx <- readRDS(file = "./rda/small_edx.rds")
@@ -45,46 +45,43 @@ There are `r length(which(colSums(is.na(edx)) > 0))` columns with at least one N
 
 There are no labels that are ordinal and should be encoded as a number.
 
-We will convert `userId` and `movieId` from an integer to a factor.
+We will convert `userId` and `movieId` from an integer to a factor.  We'll also separate the `genres` and store this result in a new dataframe - we'll need to refer to this dataframe a couple of times and don't want to redo this computationally expensive process.  We'll create a `review_date` variable from `timestamp` for the same reason.
 ```{r echo = TRUE}
 
 edx <- edx %>%
   mutate(userId = factor(userId),
-         movieId = factor(movieId))
+         movieId = factor(movieId),
+         review_date = date(as_datetime(timestamp)))
+
+movieId_by_genre <- edx %>% 
+  select(movieId, rating, genres) %>% 
+  separate_rows(genres, sep = "\\|")
 
 ```
 
 
 
-# Response Variable
+## Response Variable
+`rating`
 ```{r echo = TRUE}
 
 summary(edx$rating)
 
 ```
-The `ratings` response variable shows a predominance of whole-star ratings.  This may be due at least two factors: the rating data does not include half-star ratings until 2003 and users may have a strong preference for whole-star ratings.  Looking at either the whole-star or half-star ratings we see a somewhat normal distribution which is strongly left skewed.
+The `rating` response variable shows a predominance of whole-star ratings.  This may be due at least two factors: the rating data does not include half-star ratings until 2003 and users may have a strong preference for whole-star ratings.  Looking at either the whole-star or half-star ratings we see a somewhat normal distribution which is strongly left skewed.
 ```{r}
 
 edx %>% ggplot(aes(x=rating)) +
   geom_histogram(binwidth = .5, col="grey") +
   scale_x_continuous(breaks = seq(.5, 5, .5)) +
-  labs(title = "Ratings") +
+  labs(title = "Rating") +
   theme_economist_white()
 
 ```
 ## Other Variables
-```{r echo = TRUE, results = "hide"}
-# unconcatenate the genres to count them
-rated_movies_grouped_by_genre <- edx %>% 
-  separate_rows(genres, sep = "\\|") %>% 
-  group_by(genres) 
-
-length(unique(rated_movies_grouped_by_genre))
-
-```
 In the dataset there are:
 
-- **`r length(unique(rated_movies_grouped_by_genre <- edx %>% separate_rows(genres, sep = "\\|") %>% group_by(genres) ))`** unique movie genres.
+- **`r length(unique(movieId_by_genre$genres))`** unique movie genres.
 - **`r length(unique(edx$userId))`** unique users
 - **`r length(unique(edx$movieId))`** unique movies rated
 
@@ -92,30 +89,27 @@ In the dataset there are:
 Number of reviewed movies in each genre.  Note that a movie may be tagged with several genres, e.g., the movie "Boomerang" is classified as both a "Comedy" and a "Romance."
 ```{r echo = TRUE}
 
-edx %>% 
-  separate_rows(genres, sep = "\\|") %>% 
-  group_by(genres) %>% 
-  summarise(count = n()) %>% 
-  ggplot() +
-    geom_col(aes(x = reorder(genres, -count), y = count)) +
-    coord_flip() +
-    xlab("Genre") +
-    ylab("Number of Movies") +
-    labs(title = "Movies in Each Genre") +
-    theme_economist_white() +
-    theme(axis.text.y.left = element_text(hjust = 1),
-          panel.grid.major = element_blank(),
-          axis.ticks.y.left = element_line(),
-          axis.ticks.x.bottom = element_blank())
+movieId_by_genre %>% 
+group_by(genres) %>% 
+summarise(count = n()) %>% 
+ggplot() +
+  geom_col(aes(x = reorder(genres, -count), y = count)) +
+  coord_flip() +
+  xlab("Genre") +
+  ylab("Number of Movies") +
+  labs(title = "Movies in Each Genre") +
+  theme_economist_white() +
+  theme(axis.text.y.left = element_text(hjust = 1),
+        panel.grid.major = element_blank(),
+        axis.ticks.y.left = element_line(),
+        axis.ticks.x.bottom = element_blank())
 
 ```
 
 Which movies did not have a genre listed? 
 ```{r echo = TRUE}
 
-no_genre <- edx %>% filter(genres == "(no genres listed)")
-no_genre
-
+edx %>% filter(genres == "(no genres listed)")
 
 ```
 
@@ -128,17 +122,17 @@ library(tidyverse)
 
 q <- edx %>% 
   group_by(userId) %>% 
-  summarise(num_of_movies_rated = n())
+  summarise(num_of_movies_reviewed = n())
 
-summary(q$num_of_movies_rated)
+summary(q$num_of_movies_reviewed)
 
 ```
 
 
 ```{r echo = TRUE}
 q %>% ggplot() +
-  stat_count(geom = "bar", aes(x = num_of_movies_rated)) +
-  labs(title = "Number of Movies Rated by Users") +
+  stat_count(geom = "bar", aes(x = num_of_movies_reviewed)) +
+  labs(title = "Number of Movies Reviewed by Users") +
   theme_economist_white()
   
 ```
@@ -146,70 +140,67 @@ q %>% ggplot() +
 ### Movies
 Do some movies receive more reviews than others?
 ```{r echo = TRUE}
-library(lubridate)
-library(tidyverse)
 
-q <- edx %>% 
+edx_working <- edx %>% 
   group_by(movieId) %>% 
   summarise(num_of_reviews_movie = n())
 
-summary(q$num_of_reviews_movie)
+summary(edx_working$num_of_reviews_movie)
 
 ```
 
 How are the reviews/movie distributed?
 ```{r echo = TRUE}
 
-q %>% ggplot() +
+edx_working %>% ggplot() +
   stat_count(geom = "bar", aes(x = num_of_reviews_movie)) +
+  scale_y_continuous(limits = c(0, 100)) +
   labs(title = "Number of Reviews/Movie") +
   theme_economist_white()
   
 ```
 
-What are the most reviewed movies...
+What are the most frequently reviewed movies...
 ```{r echo = TRUE}
 
-edx %>% 
-  group_by(title) %>% 
-  summarise(count = n()) %>% 
-  arrange(-count) %>% 
-  top_n(5)
+edx_working <- edx %>% 
+    group_by(title) %>% 
+    summarise(count = n()) %>% 
+    arrange(-count)
+
+edx_working[1:10,]
 
 ```
- ...and least reviewed movies?
+ ...and least frequently reviewed movies?
 ```{r echo = TRUE}
 
-edx %>% 
-  group_by(title) %>% 
-  summarise(count = n()) %>% 
-  arrange(count) %>% 
-  top_n(5)
+edx_working <- edx_working %>% 
+  arrange(count)
+
+edx_working[1:10,]
 
 ```
 ### Timestamp
 ```{r echo = TRUE}
 
-edx_working <- edx %>% 
-  mutate(review_date = date(as_datetime(timestamp)))
-
-summary(edx_working$review_date)
+summary(edx$review_date)
 
 ```
 How does the number of movies reviewed change over time?
 ```{r echo = TRUE}
 
-q <- edx_working %>% 
+edx_working <- edx %>% 
   mutate(review_period = round_date(review_date, unit = "months")) %>% 
   group_by(review_period) %>% 
   summarise(count = n())
 
-q %>% ggplot(aes(x = review_period, y = count)) +
-  geom_point() +
-  geom_smooth(se = FALSE) +
-  labs(title = "Number of Reviews Over Time") +
-  scale_x_date(name = "Month") +
-  theme_economist_white()
+edx_working %>% 
+  ggplot(aes(x = review_period, y = count)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    labs(title = "Number of Reviews Over Time", subtitle = "monthly average") +
+    scale_x_date(name = NULL) +
+    theme_economist_white()
 
 
 ```
@@ -221,23 +212,20 @@ There are no continuous numeric predictors to correlate with `rating` in the giv
 Let's look at the overall average movie rating over time.
 ```{r echo = TRUE}
 
-# first change the timestamp into a human-readable format
-edx_working <- edx %>% 
-  mutate(review_date = date(as_datetime(timestamp)))
+mu <- mean(edx$rating)
 
-q <- edx_working %>% 
-  mutate(review_period = round_date(review_date, unit = "month")) %>% 
+edx_working <- edx %>% 
+  mutate(review_period = round_date(review_date, unit = "year")) %>% 
   group_by(review_period) %>% 
   summarise(avg_rating = mean(rating))
 
-q %>% ggplot(aes(x = review_period, y = avg_rating)) +
+edx_working %>% ggplot(aes(x = review_period, y = avg_rating)) +
   geom_point() +
   geom_smooth(se = FALSE) +
-  scale_x_date(name = "Month") +
-  scale_y_continuous(limits = c(.5, 5)) +
+  geom_hline(yintercept = mu, color = "grey", linetype = "dashed") +
+  scale_x_date(name = "Year") +
   labs(title = "Average Rating Over Time") +
   theme_economist_white()
-
 
 ```
 
@@ -245,28 +233,25 @@ Does a particular movie's `average rating` change over time?  There are too many
 
 ```{r echo = TRUE, results = "hide"}
 
-# change the timestamp into date object
+mu <- mean(edx$rating)
+
+t <- sample(edx$movieId, 25)
+
 edx_working <- edx %>% 
-  mutate(review_date = date(as_datetime(timestamp)))
-
-mu <- mean(edx_working$rating)
-
-t <- sample(edx_working$movieId, 25)
-
-q <- edx_working %>% 
   filter(movieId %in% t) %>% 
   mutate(review_period = round_date(review_date, unit = "year")) %>% 
   group_by(movieId, review_period) %>% 
   summarise(avg_rating = mean(rating))
 
-q %>% ggplot(aes(x = review_period, y = avg_rating)) +
-  geom_line(color = "blue") +
-  geom_hline(yintercept = mu, color = "grey", linetype = "dashed") +
-  scale_x_date(name = "Year") +
-  scale_y_continuous(limits = c(.5, 5), breaks = NULL) +
-  labs(title = "Average Rating for Individual Movies Over Time") +
-  facet_wrap(~ movieId) 
-  
+edx_working %>% 
+  ggplot(aes(x = review_period, y = avg_rating)) +
+    geom_line(color = "blue") +
+    geom_hline(yintercept = mu, color = "grey", linetype = "dashed") +
+    scale_x_date(name = "Year") +
+    scale_y_continuous(breaks = NULL) +
+    labs(title = "Average Rating for Individual Movies Over Time") +
+    facet_wrap(~ movieId) 
+    
 
 ```
 
@@ -277,8 +262,7 @@ mu <- mean(edx$rating)
 
 edx_working <- edx %>%
   mutate(movie_release_year = as.integer(str_extract(str_extract(title, "\\(\\d{4}\\)"), "\\d{4}")),
-         rating_date = as_datetime(timestamp),
-         movie_age_at_rating = year(rating_date) - movie_release_year) 
+         movie_age_at_rating = year(review_date) - movie_release_year) 
 
 edx_working <- edx_working %>% 
   group_by(movie_age_at_rating) %>%
@@ -299,26 +283,24 @@ Does a particular user's average rating change over time?  There are too many us
 
 mu <- mean(edx$rating)
 
-# change the timestamp into date object
+t <- sample(edx$userId, 25)
+
 edx_working <- edx %>% 
-  mutate(review_date = date(as_datetime(timestamp)))
-
-t <- sample(edx_working$userId, 25)
-
-q <- edx_working %>% 
   filter(userId %in% t) %>% 
   mutate(review_period = round_date(review_date, unit = "year")) %>% 
   group_by(userId, review_period) %>% 
   summarise(avg_rating = mean(rating))
 
-q %>% ggplot(aes(x = review_period, y = avg_rating)) +
-  geom_line(color = "blue") +
-  geom_hline(yintercept = mu, color = "grey", linetype = "dashed") +
-  scale_x_date(name = "Year") +
-  scale_y_continuous(limits = c(.5, 5), breaks = NULL) +
-  labs(title = "Average Rating for Individual Users Over Time") +
-  facet_wrap(~ userId) 
-  
+edx_working %>% 
+  ggplot(aes(x = review_period, y = avg_rating)) +
+    geom_line(color = "blue") +
+    geom_hline(yintercept = mu, color = "grey", linetype = "dashed") +
+    scale_x_date(name = "Year") +
+    scale_y_continuous(limits = c(.5, 5), breaks = NULL) +
+    labs(title = "Average Rating for Individual Users Over Time") +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+    facet_wrap(~ userId) 
+    
 ```
 
 ## New variables that might correlate with `rating`
@@ -327,14 +309,13 @@ How does rating change related to `user's length of time reviewing` at the time 
 
 mu <- mean(edx$rating)
 
-q <- edx %>% 
+t <- edx %>% 
   group_by(userId) %>% 
   summarise(user_first_rating = date(as_datetime(min(timestamp))))
 
 edx_working <- edx %>% 
-  left_join(q, by = "userId") %>% 
-  mutate(rating_date = date(as_datetime(timestamp)),
-         days_since_first_rating =  as.integer(rating_date - user_first_rating))
+  left_join(t, by = "userId") %>% 
+  mutate(days_since_first_rating =  as.integer(review_date - user_first_rating))
 
 edx_working <- edx_working %>% 
   group_by(days_since_first_rating) %>%
@@ -344,24 +325,23 @@ edx_working %>%
   ggplot(aes(x = days_since_first_rating, y = avg_rating)) +
     geom_point() +
     geom_smooth(se = FALSE) +
-    scale_y_continuous(limits = c(.5, 5)) +
     geom_hline(yintercept = mu, linetype = "dashed") +
     theme_economist_white()
 
 ```
 
 
-Is there a relationship between the `number of reviews of a movie` and the rating of that movie?  For reference, the dashed horizontal line is the overall average rating.
+Is there a relationship between the `number of reviews a movie received` (popularity) and the rating of that movie?  For reference, the dashed horizontal line is the overall average rating.
 ```{r echo = TRUE}
 
 mu <- mean(edx$rating)
 
-q <- edx %>% 
+t <- edx %>% 
   group_by(movieId) %>% 
   summarise(num_of_reviews_of_movie = n())
 
 edx_working <- edx %>%
-  left_join(q, by = "movieId")
+  left_join(t, by = "movieId")
 
 edx_working <- edx_working %>% 
   group_by(num_of_reviews_of_movie) %>%
@@ -372,12 +352,11 @@ edx_working %>%
     geom_point() +
     geom_smooth(se = FALSE) +
     geom_hline(yintercept = mu, linetype = "dashed") +
-    scale_y_continuous(limits = c(.5, 5)) +
     theme_economist_white()
 
 ```
 
-Is there a relationship between the `number of movies a user has reviewed` and that users ratings?
+Is there a relationship between the `number of movies a user has reviewed` and that user's ratings?
 ```{r}
 
 mu <- mean(edx$rating)
@@ -392,7 +371,6 @@ edx_working %>% ggplot(aes(x = num_ratings, y = avg_rating)) +
   geom_hline(yintercept = mu, linetype = "dashed") +
   theme_economist_white()
 
-
 ```
 
 How does genre affect a movie's rating?
@@ -400,16 +378,7 @@ How does genre affect a movie's rating?
 
 mu <- mean(edx$rating)
 
-edx_working <- edx
-#
-# Separate and factorize the genres
-#
-edx_working <- edx_working %>% 
-  separate_rows(genres, sep = "\\|") %>% 
-  mutate(genre = factor(genres))
-
-# combined genre and rating
-edx_working <- edx_working %>% 
+edx_working <- movieId_by_genre %>% 
   group_by(genres) %>% 
   summarise(avg_rating = mean(rating))
   
@@ -424,5 +393,14 @@ edx_working %>%
 
 ```
 
+
+```{r echo = FALSE, results = "hide"}
+
+#Clean up
+
+rm(edx_working, no_genre, q, rated_movies_grouped_by_genre, mu, NAcol, t, movieId_by_genre)
+gc()
+
+```
 
 
