@@ -5,6 +5,22 @@ output:
   html_notebook: default
 ---
 
+##Feature Engineering 
+We'll make the date of the review easier to read by creating a `review_date` variable from the `timestamp` variable.
+create a date-movie- was released variable from the parens in the title
+We'll create a movie_age variable
+we'll create a # of movies reveiwed by user variable
+create time since first review by this user variable
+leave the genre variable alone (not worth it at this point)
+```{r}
+
+edx <- edx %>%
+  mutate(review_date = date(as_datetime(timestamp)))
+
+```
+
+
+
 ```{r echo=FALSE, results='hide'}
 
 library(tidyverse)
