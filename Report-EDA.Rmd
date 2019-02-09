@@ -11,10 +11,10 @@ library(lubridate)
 
 #edx <- data.table::fread("./data/train.csv")
 
- edx <- readRDS(file = "./rda/full_edx.rds")
+# edx <- readRDS(file = "./rda/full_edx.rds")
 # validation <- readRDS (file = "./rda/full_Validation.rds")
 
-#edx <- readRDS(file = "./rda/small_edx.rds")
+edx <- readRDS(file = "./rda/small_edx.rds")
 #validation <- readRDS (file = "./rda/small_Validation.rds")
 
 
@@ -154,7 +154,6 @@ How are the reviews/movie distributed?
 
 edx_working %>% ggplot() +
   stat_count(geom = "bar", aes(x = num_of_reviews_movie)) +
-  scale_y_continuous(limits = c(0, 100)) +
   labs(title = "Number of Reviews/Movie") +
   theme_economist_white()
   
@@ -398,7 +397,7 @@ edx_working %>%
 
 #Clean up
 
-rm(edx_working, no_genre, q, rated_movies_grouped_by_genre, mu, NAcol, t, movieId_by_genre)
+rm(edx_working, q, mu, NAcol, t, movieId_by_genre)
 gc()
 
 ```
