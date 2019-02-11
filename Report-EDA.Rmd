@@ -230,7 +230,7 @@ edx_working %>% ggplot(aes(x = review_period, y = avg_rating)) +
 
 Does a particular movie's `average rating` change over time?  There are too many movies to visualize this effectively so we will select a small random sample.  For reference, the dashed horizontal line is the overall average rating.
 
-```{r echo = TRUE, results = "hide"}
+```{r echo = TRUE, results = "hide", message = FALSE}
 
 mu <- mean(edx$rating)
 
@@ -278,7 +278,7 @@ edx_working %>%
 ```
 
 Does a particular user's average rating change over time?  There are too many users to visualize this effectively so we will select a small random sample.  For reference, the dashed horizontal line is the overall average rating.
-```{r echo = TRUE, results = "hide"}
+```{r echo = TRUE, results = "hide", message = FALSE}
 
 mu <- mean(edx$rating)
 
@@ -366,11 +366,34 @@ edx_working <- edx %>%
 
 edx_working %>% ggplot(aes(x = num_ratings, y = avg_rating)) +
   geom_point() +
-  geom_smooth(se = FALSE) +
   geom_hline(yintercept = mu, linetype = "dashed") +
   theme_economist_white()
 
 ```
+
+How does the number of movies reviewed on a particular date by a user (frequency) effect ?
+```{r}
+
+edx_working <- edx
+
+mjb <- edx_working %>% 
+  group_by(userId, review_date) %>% 
+  summarise(F_i = n(), b_i_f = log(n()))
+
+edx_working <- edx_working %>% 
+  left_join(mjb)
+
+edx_working %>% 
+  ggplot(aes(x = F_i, y = rating)) +
+  geom_boxplot(aes(group = F_i)) +
+  theme_economist_white()
+
+```
+
+
+
+
+
 
 How does genre affect a movie's rating?
 ```{r echo = TRUE}
