@@ -3,7 +3,7 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-```{r}
+``` {r}
 library(tidyverse)
 library(caret)
 
@@ -21,7 +21,7 @@ validation <- readRDS (file = "./rda/full_Validation.rds")
 ```
 
 
-```{r}
+``` {r}
 
 train_set <- edx
 test_set <- validation
@@ -35,7 +35,7 @@ RMSE <- function(true_ratings, predicted_ratings) {
 ```
 
 ## Feature Engineering (from EDA)
-```{r}
+``` {r}
 library(lubridate)
 
 # factorize userId and movieId
@@ -52,7 +52,7 @@ test_set <- test_set %>%
   select(-timestamp)
 
 
-# create a rated_year feature
+# create a reviewed_year feature
 train_set <- train_set %>%
   mutate(reviewed_year = as.integer(year(review_date)))
 test_set <- test_set %>%
@@ -80,7 +80,7 @@ test_set <- test_set %>%
 
 
 ## Custom Model (Netflix)
-```{r}
+``` {r}
 
 # r = mu + b_i(t) + b_u
 
@@ -118,35 +118,101 @@ rm(movie_time_bias, predicted_ratings, user_avgs, lambda1, lambda2, mu)
 ```
 
 ## XGBoost
-```{r}
+``` {r eval=FALSE}
 
-fitControl <- trainControl(method = "cv", number = 10)
+mjb_train_set <- train_set %>% 
+  mutate(movieId = as.integer(movieId),
+         userId = as.integer(userId))
+
+mjb_test_set <- test_set %>% 
+  mutate(movieId = as.integer(movieId),
+         userId = as.integer(userId))
+
+fitControl <- trainControl(method = "cv", number = 2)
 
 xgbGrid <- expand.grid(gamma = 0,
                        min_child_weight = 1,
-                       nrounds = 50,
-                       max_depth = 3,
-                       eta = 0.4,
+                       nrounds = 300,
+                       max_depth = 7,
+                       eta = 0.3,
                        colsample_bytree = 0.8,
                        subsample = 1)
 
 start <- Sys.time()
 
-fit <- train(rating ~ userId + movieId + reviewed_year,
-             data = train_set,
+fit <- train(rating ~ userId + movieId + reviewed_year + movie_release_year + movie_age_at_rating,
+             data = mjb_train_set,
              method = "xgbTree",
              tuneGrid = xgbGrid,
-             trControl = fitControl)
+             trControl = fitControl, 
+             preProcess = c("center", "scale"))
 
 end <-Sys.time()
 mjb <- end - start
 
-q <- predict(fit, test_set)
+q <- predict(fit, mjb_test_set)
 
-final_xgb_predictions <- data.frame(userId = as.character(test_set$userId), movieId = as.character(test_set$movieId), xgb_pred = q)
+final_xgb_predictions <- data.frame(userId = as.character(mjb_test_set$userId), movieId = as.character(mjb_test_set$movieId), xgb_pred = q)
 
-RMSE_xgb <- RMSE(test_set$rating, q)
+RMSE_xgb <- RMSE(mjb_test_set$rating, q)
 
 
 ```
 
+## IBCF  
+Tried this with one predictor on full dataset and it took over 12 hours to complete with RMSE > 1.  Need more than one predictor but
+don't have resources.
+``` {r eval=FALSE}
+
+# library(recommenderlab)
+# 
+# # can't afford to run on entire dataset.  just use the top_n number of rated movies.
+# temp <- edx %>%
+#   group_by(movieId) %>%
+#   summarise(count = n()) %>%
+#   top_n(1000, wt = count) %>%
+#   arrange(-count) %>%
+#   mutate(running_total = cumsum(count))
+# 
+# train_set <- semi_join(edx, temp, by = "movieId")
+# 
+# 
+# #
+# # reduce the size of the training set to only those items in the validation set
+# # no reason to use resources to predict ratings on non-requested items
+# #
+# # train_set <- train_set %>%
+# #   filter(movieId %in% unique(validation$movieId))
+# 
+# 
+# r <- as(train_set, "realRatingMatrix")
+# rec.model <- Recommender(data = r,
+#                         method = "IBCF",
+#                         parameter = list(method = "Cosine"))
+# 
+# pred <- predict(rec.model, r, type = "ratings")
+# pred_matrix <- as(pred, "matrix")
+# 
+# # make into a df to visualize and join easier than a matrix
+# ibcf_preds <- pred_matrix %>% 
+#   as.data.frame.matrix() %>% 
+#   rownames_to_column(var = "userId") %>% 
+#   gather(key = movieId, value = IBCF_rating, -userId)
+# 
+# test_set <- test_set %>% 
+#  mutate(userId = as.character(userId),
+#         movieId = as.character(movieId)) %>% 
+#  select(userId, movieId)
+# 
+# mu <- mean(train_set$rating)
+# 
+# # Join the predictions to the test_set
+# final_ibcf_predictions <- left_join(test_set, ibcf_preds)
+# 
+# final_ibcf_predictions <- final_ibcf_predictions %>% 
+#   mutate(IBCF_rating = if_else(is.na(IBCF_rating), mu, IBCF_rating))
+# 
+# 
+# RMSE_IBCF <- RMSE(validation$rating, final_ibcf_predictions$IBCF_rating)
+
+```
