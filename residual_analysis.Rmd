@@ -1,0 +1,46 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+
+preds <- data.frame(userId = test_set$userId, 
+                    movieId = test_set$movieId, 
+                    rating = test_set$rating, 
+                    custom_pred = custom_predicted_ratings$pred, 
+                    xgb_pred = final_xgb_predictions$xgb_pred)
+```
+
+```{r}
+preds %>% 
+  ggplot(aes(x = rating, y = custom_pred)) +
+  geom_point(col = "grey") 
+
+```
+
+
+```{r}
+
+preds %>% 
+  ggplot(aes(x = rating, y = xgb_pred)) +
+  geom_point(col = "grey")
+
+```
+
+```{r}
+
+ens_pred <- (custom_predicted_ratings$pred + final_xgb_predictions$xgb_pred) / 2
+
+ens_RMSE <- RMSE(test_set$rating, ens_pred)
+
+```
+
+```{r}
+
+preds %>% 
+  ggplot(aes(x = test_set$rating, y = ens_pred)) +
+  geom_point(col = "grey")
+
+```
+

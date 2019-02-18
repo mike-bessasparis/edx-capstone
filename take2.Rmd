@@ -30,7 +30,7 @@ RMSE <- function(true_ratings, predicted_ratings) {
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
 
-#rm(edx, validation)
+rm(edx, validation)
 
 ```
 
@@ -39,41 +39,36 @@ RMSE <- function(true_ratings, predicted_ratings) {
 library(lubridate)
 
 # factorize userId and movieId
-# create a reviewed_date feature
+# create a reviewed_date and reviewed_year feature
 train_set <- train_set %>%
   mutate(userId = factor(userId),
          movieId = factor(movieId),
-         review_date = date(as_datetime(timestamp)))
+         review_date = date(as_datetime(timestamp)),
+         review_year = year(review_date))
 test_set <- test_set %>%
   mutate(userId = factor(userId),
          movieId = factor(movieId),
-         review_date = date(as_datetime(timestamp)))
-
+         review_date = date(as_datetime(timestamp)),
+         review_year = year(review_date))
 
 mu <- mean(train_set$rating)
-q <- train_set %>% 
-  group_by(movieId) %>% 
-  summarise(movie_bias = round(mean(rating - mu), 1))
-train_set <- train_set %>% 
-  left_join(q, by = "movieId")
-test_set <- test_set %>% 
-  left_join(q, by = "movieId")
 
-q <- train_set %>% 
+
+
+# find b_i(t), the rating bias for each movie as a function of time (year)
+lambda1 <- 3
+movie_time_bias <- train_set %>% 
+  group_by(movieId, review_year) %>% 
+  summarize(b_i_time = sum(rating - mu) / (n() + lambda1))
+train_set <- left_join(train_set, movie_time_bias, by = c("movieId", "review_year"))
+
+# find the user rating bias for each user
+lambda2 <- 5
+user_bias <- train_set %>% 
   group_by(userId) %>% 
-  summarise(user_bias = round(mean(rating - mu), 1))
-train_set <- train_set %>% 
-  left_join(q, by = "userId")
-test_set <- test_set %>% 
-  left_join(q, by = "userId")
+  summarize(b_u = sum(rating - mu - b_i_time) / (n() + lambda2) )
+train_set <- left_join(train_set, user_bias, by = "userId")
 
-
-
-# create a reviewed_year feature
-train_set <- train_set %>%
-  mutate(reviewed_year = as.integer(year(review_date)))
-test_set <- test_set %>%
-  mutate(reviewed_year = as.integer(year(review_date)))
 
 
 # create released_year and movie_age_at_rating features
@@ -83,6 +78,7 @@ train_set <- train_set %>%
 test_set <- test_set %>%
   mutate(movie_release_year = as.integer(str_extract(str_extract(title, "\\(\\d{4}\\)"), "\\d{4}")),
          movie_age_at_rating = year(review_date) - movie_release_year)
+
 
 
 # Create the number of times a movie has been reviewed predictor
@@ -112,49 +108,33 @@ test_set <- test_set %>%
 
 # r = mu + b_i(t) + b_u
 
-# find the overall average rating
-mu <- mean(train_set$rating)
-
-# find b_i(t), the rating bias for each movie as a function of time (year)
-lambda1 <- 3
-movie_time_bias <- train_set %>% 
-  group_by(movieId, reviewed_year) %>% 
-  summarize(b_i_time = sum(rating - mu) / (n() + lambda1))
-
-# find the rating bias for each user
-# (the "leftover" after finding b_i)
-lambda2 <- 5
-user_avgs <- train_set %>% 
-  left_join(movie_time_bias, by = c("movieId", "reviewed_year")) %>% 
-  group_by(userId) %>% 
-  summarize(b_u = sum(rating - mu - b_i_time) / (n() + lambda2) )
-
-# combine and make predictions
-predicted_ratings <- test_set %>% 
-  left_join(movie_time_bias, by = c("movieId", "reviewed_year")) %>% 
+# add movie and user bias calculated from the train_set and make predictions
+# mutate is to put 0 where we don't have a calculated movie_time_bias
+custom_predicted_ratings <- test_set %>% 
+  left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
   mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
-  left_join(user_avgs, by = "userId") %>% 
+  left_join(user_bias, by = "userId") %>% 
   mutate(pred = mu + b_i_time + b_u)
 
 # recover predictions outside of rating range
-predicted_ratings <- predicted_ratings %>% 
+custom_predicted_ratings <- custom_predicted_ratings %>% 
   select(userId, movieId, pred) %>% 
   mutate(pred = if_else(pred > 5, 5, pred),
          pred = if_else(pred < 0.5, 0.5, pred))
 
-q <- RMSE(test_set$rating, predicted_ratings$pred)
+RMSE_cust <- RMSE(test_set$rating, custom_predicted_ratings$pred)
 
 #ggplot(data = test_set, aes(x = test_set$rating, y = predicted_ratings$pred)) +
 #       geom_point()
 
-rm(movie_time_bias, predicted_ratings, user_avgs, lambda1, lambda2, mu)
+#rm(movie_time_bias, predicted_ratings, user_bias, lambda1, lambda2, mu)
 
 ```
 
 ## XGBoost
 ``` {r eval=FALSE}
 
-fitControl <- trainControl(method = "cv", number = 2)
+fitControl <- trainControl(method = "cv", number = 3)
 
 xgbGrid <- expand.grid(gamma = 0,
                        min_child_weight = 1,
@@ -166,120 +146,73 @@ xgbGrid <- expand.grid(gamma = 0,
 
 start <- Sys.time()
 
-fit <- train(rating ~ user_bias + movie_bias,
+fit <- train(rating ~ b_u + b_i_time,
              data = train_set,
              method = "xgbTree",
              tuneGrid = xgbGrid,
-             trControl = fitControl, 
+             trControl = fitControl,
              preProcess = c("center", "scale"))
 
 end <-Sys.time()
 mjb <- end - start
 
-q <- predict(fit, test_set)
+test_set_working <- test_set %>% 
+  select(-rating) %>% 
+  left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
+  mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
+  left_join(user_bias, by = "userId")
 
-final_xgb_predictions <- data.frame(userId, movieId, xgb_pred = q)
+q <- predict(fit, test_set_working)
 
-RMSE_xgb <- RMSE(test_set$rating, q)
+pred_xgb <- data.frame(userId = test_set$userId, movieId = test_set$movieId, pred = q)
+
+# recover predictions outside of rating range
+pred_xgb <- pred_xgb %>% 
+  mutate(pred = if_else(pred > 5, 5, pred),
+         pred = if_else(pred < 0.5, 0.5, pred))
+
+RMSE_xgb <- RMSE(test_set$rating, pred_xgb$pred)
 
 
 ```
 
 
 ## Neural Network
-
 ```{r}
 
-mjb_train_set <- train_set %>% 
-  mutate(movieId = as.integer(movieId),
-         userId = as.integer(userId))
-
-mjb_test_set <- test_set %>% 
-  mutate(movieId = as.integer(movieId),
-         userId = as.integer(userId))
-
-
 fitControl <- trainControl(method = "cv", number = 2)
+nnetGrid <- expand.grid(size = 3,
+                       decay = 1e-4)
 
 start <- Sys.time()
 
-fit <- train(rating ~ userId + movieId,
-             data = mjb_train_set,
+fit <- train(rating ~ b_u + b_i_time,
+             data = train_set,
              method = "nnet",
              trControl = fitControl, 
+             tuneGrid = nnetGrid,
              preProcess = c("center", "scale"),
              linout = TRUE)
 
 end <-Sys.time()
 mjb <- end - start
 
-q <- predict(fit, mjb_test_set)
+test_set_working <- test_set %>% 
+  select(-rating) %>% 
+  left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
+  mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
+  left_join(user_bias, by = "userId")
 
-RMSE_nnet <- RMSE(test_set$rating, q)
+q <- predict(fit, test_set_working)
 
-ggplot(data = test_set, aes(x = test_set$rating, y = q)) +
-       geom_point()
+pred_nnet <- data.frame(userId = test_set$userId, movieId = test_set$movieId, pred = q)
 
+# recover predictions outside of rating range
+pred_nnet <- pred_nnet %>% 
+  mutate(pred = if_else(pred > 5, 5, pred),
+         pred = if_else(pred < 0.5, 0.5, pred))
 
-```
-
-
-
-
-## IBCF  
-Tried this with one predictor on full dataset and it took over 12 hours to complete with RMSE > 1.  Need more than one predictor but
-don't have resources.
-``` {r eval=FALSE}
-
-# library(recommenderlab)
-# 
-# # can't afford to run on entire dataset.  just use the top_n number of rated movies.
-# temp <- edx %>%
-#   group_by(movieId) %>%
-#   summarise(count = n()) %>%
-#   top_n(1000, wt = count) %>%
-#   arrange(-count) %>%
-#   mutate(running_total = cumsum(count))
-# 
-# train_set <- semi_join(edx, temp, by = "movieId")
-# 
-# 
-# #
-# # reduce the size of the training set to only those items in the validation set
-# # no reason to use resources to predict ratings on non-requested items
-# #
-# # train_set <- train_set %>%
-# #   filter(movieId %in% unique(validation$movieId))
-# 
-# 
-# r <- as(train_set, "realRatingMatrix")
-# rec.model <- Recommender(data = r,
-#                         method = "IBCF",
-#                         parameter = list(method = "Cosine"))
-# 
-# pred <- predict(rec.model, r, type = "ratings")
-# pred_matrix <- as(pred, "matrix")
-# 
-# # make into a df to visualize and join easier than a matrix
-# ibcf_preds <- pred_matrix %>% 
-#   as.data.frame.matrix() %>% 
-#   rownames_to_column(var = "userId") %>% 
-#   gather(key = movieId, value = IBCF_rating, -userId)
-# 
-# test_set <- test_set %>% 
-#  mutate(userId = as.character(userId),
-#         movieId = as.character(movieId)) %>% 
-#  select(userId, movieId)
-# 
-# mu <- mean(train_set$rating)
-# 
-# # Join the predictions to the test_set
-# final_ibcf_predictions <- left_join(test_set, ibcf_preds)
-# 
-# final_ibcf_predictions <- final_ibcf_predictions %>% 
-#   mutate(IBCF_rating = if_else(is.na(IBCF_rating), mu, IBCF_rating))
-# 
-# 
-# RMSE_IBCF <- RMSE(validation$rating, final_ibcf_predictions$IBCF_rating)
+RMSE_nnet <- RMSE(test_set$rating, pred_nnet$pred)
 
 ```
+
