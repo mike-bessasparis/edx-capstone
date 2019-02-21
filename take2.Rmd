@@ -11,11 +11,11 @@ library(caret)
 library(lubridate)
 
 
-#edx <- readRDS(file = "./rda/full_edx.rds")
-#validation <- readRDS (file = "./rda/full_Validation.rds")
+edx <- readRDS(file = "./rda/full_edx.rds")
+validation <- readRDS (file = "./rda/full_Validation.rds")
 
-edx <- readRDS(file = "./rda/small_edx.rds")
-validation <- readRDS (file = "./rda/small_Validation.rds")
+#edx <- readRDS(file = "./rda/small_edx.rds")
+#validation <- readRDS (file = "./rda/small_Validation.rds")
 
 ```
 
