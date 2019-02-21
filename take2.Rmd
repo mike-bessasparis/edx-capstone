@@ -127,26 +127,27 @@ rm(pred_custom)
 ```
 
 ## XGBoost
+Model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.
 ``` {r}
-
-fitControl <- trainControl(method = "cv", number = 3)
-
-xgbGrid <- expand.grid(gamma = 0,
-                       min_child_weight = 1,
-                       nrounds = 300,
-                       max_depth = 7,
-                       eta = 0.3,
-                       colsample_bytree = 0.8,
-                       subsample = 1)
 
 start_xgb <- Sys.time()
 
-fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
-             data = train_set,
-             method = "xgbTree",
-             tuneGrid = xgbGrid,
-             trControl = fitControl,
-             preProcess = c("center", "scale"))
+# fitControl <- trainControl(method = "cv", number = 5)
+# 
+# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
+#              data = train_set,
+#              method = "xgbTree",
+#              trControl = fitControl,
+#              preProcess = c("center", "scale"))
+
+fit <- xgboost::xgboost(data = train_set, 
+                        params = list(eta = 0.3, 
+                                      gamma = 0,
+                                      max_depth = 7,
+                                      min_child_weight = 1,
+                                      subsample = 1,
+                                      colsample_bytree = 0.8),
+                        nrounds = 300)
 
 # add movie and user bias calculated from the train_set and make predictions
 # mutate is to put 0 where we don't have a calculated movie_time_bias
@@ -173,22 +174,26 @@ rm(fitControl, test_set_working, xgbGrid, q, pred_xgb, start_xgb)
 
 
 ## Neural Network
+Model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.
 ```{r}
-
-fitControl <- trainControl(method = "cv", number = 2)
-nnetGrid <- expand.grid(size = 3,
-                       decay = 1e-4)
 
 start_nnet <- Sys.time()
 
-fit <- train(rating ~ b_u + b_i_time + num_of_reviews_of_movie,
-             data = train_set,
-             method = "nnet",
-             trControl = fitControl, 
-             tuneGrid = nnetGrid,
-             preProcess = c("center", "scale"),
-             linout = TRUE)
+# fitControl <- trainControl(method = "cv", number = 5)
+# 
+# fit <- train(rating ~ b_u + b_i_time + num_of_reviews_of_movie,
+#              data = train_set,
+#              method = "nnet",
+#              trControl = fitControl, 
+#              preProcess = c("center", "scale"),
+#              linout = TRUE)
+# 
 
+# train model using previously identified parameters
+fit <- nnet::nnet(rating ~ b_u + b_i_time + num_of_reviews_of_movie, 
+                  data = train_set, 
+                  size = 3,
+                  decay = 1e-4)
 
 # add movie and user bias calculated from the train_set and make predictions
 # mutate is to put 0 where we don't have a calculated movie_time_bias
