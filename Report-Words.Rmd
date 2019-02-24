@@ -1,0 +1,37 @@
+---
+title: "Data Science: Capstone"
+output: html_notebook
+---
+
+The report that documents the analysis and presents the findings, along with supporting statistics and figures. The report is written in English and uploaded. The report should include the RMSE generated. The report includes at least the following sections:
+
+## Executive Summary
+an introduction/overview/executive summary section that describes the dataset and summarizes the goal of the project and key steps that were performed
+
+Goal of project was to reinforce past learning, find solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.
+
+## Methods
+a methods/analysis section that explains the process and techniques used, such as data cleaning, data exploration and visualization, any insights gained, and your modeling approach
+
+There are very few predictors in the edx dataset.  I depended heavily on prior published work with the dataset to define various additional predictors.
+
+I choose an ensemble model.  I did not have the ocmputing resources to analyze the entire data.  I had to work with various sample sizes.  I felt that using several different types of models with these samples and choosing the average had the best chance of being most correct.
+
+## Results
+a results section
+
+## Conclusion
+I learned a lot:
+ * How to work with large dataset (sampling, model parameter guessing)
+ * Microsoft Azure virtual machines
+ * Paralellism in R (doParallel) - Parallel process speeds up some things a lot.  I had 8 cores available but not enough RAM (only 32GB) to use them all on the entire dataset.
+ * Enhanced knowledge of git version control.  I created a VM on Azure to do heavy duty processing.  But, as that cost money, I used my local (small) PC for non-computational-expensive things.  I developed methods for data exploration, visualization on a very small dataset locally.  Only when they appearing to offer insights did I execute them on my Azure VM with the entire dataset.
+
+
+
+0 points: The report is either not uploaded or contains very minimal information.
+20 points: Multiple required sections of the report are missing.
+25 points: One required section of the report is missing.
+30 points: The report includes all required sections, but the report is significantly difficult to follow or missing significant supporting detail in multiple sections.
+35 points: The report includes all required sections, but the report is difficult to follow or missing supporting detail in one section (or has minor flaws in multiple sections).
+40 points: The report includes all required sections and is easy to follow with good supporting detail throughout.
