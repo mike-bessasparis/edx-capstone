@@ -11,25 +11,39 @@ library(caret)
 library(lubridate)
 
 
-edx <- readRDS(file = "./rda/full_edx.rds")
-validation <- readRDS (file = "./rda/full_Validation.rds")
+edx <- readRDS(file = "./rda/edx.rds")
+validation <- readRDS (file = "./rda/validation.rds")
 
 #edx <- readRDS(file = "./rda/small_edx.rds")
 #validation <- readRDS (file = "./rda/small_Validation.rds")
 
 ```
 
-I use the edx data as my train_set and the validation data, after removing the actual rating, as the test_set.
+Use the edx data as the base to create a train_set and test_set.
 ``` {r}
 
-train_set <- edx
-test_set <- validation %>% select(-rating)
+# test_set set will be 10% of edx data
+set.seed(1)
+test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
+train_set <- edx[-test_index,]
+temp <- edx[test_index,]
+
+# Make sure userId and movieId in test_set are also in train_set
+test_set <- temp %>% 
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, test_set)
+train_set <- rbind(train_set, removed)
+
 
 RMSE <- function(true_ratings, predicted_ratings) {
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
 
 
+rm(edx, removed, test_index, temp)
 ```
 
 ## Feature Engineering (from EDA)
@@ -100,7 +114,7 @@ rm(lambda1, lambda2, q)
 
 ## Custom Model (Netflix)
 This is the model we started in class.  I copied the method from the class and extended that model using the reference provided in the class: 
-"The BellKor Solution to the Netflix Grand Prize", Yehuda Koren, August 2009.  I implemented only a simplified version of the movie bias as a function of time referenced in the paper.  I also corrected for estimates outside the given rating range of 0.5 - 5.
+"The BellKor Solution to the Netflix Grand Prize", Yehuda Koren, August 2009.  I implemented only a simplified version of the movie bias as a function of time referenced in the paper.  I correct for estimates outside the given rating range of 0.5 - 5.
 ``` {r}
 
 # r = mu + b_i(t) + b_u
@@ -122,18 +136,25 @@ pred_custom <- pred_custom %>%
 ensemble_preds <- ensemble_preds %>% 
   left_join(pred_custom, by = c("userId", "movieId"))
 
-rm(pred_custom)
+rmse_custom <- RMSE(pred_custom$pred_c, test_set$rating)
 
 ```
 
 ## XGBoost
-Model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.  I use train() here for convenience.
+Selection of features was made over many previous interations of train() using a small sample of the train_set.  The final set of features showed the best promise of working well on the entire data set.  The model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.  I use train() here for convenience.
 ``` {r}
 
 start_xgb <- Sys.time()
 
-# fitControl <- trainControl(method = "cv", number = 5)
-# 
+set.seed(1)
+fitControl <- trainControl(method = "cv", number = 5)
+
+fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
+             data = train_set,
+             method = "xgbTree",
+             trControl = fitControl,
+             preProcess = c("center", "scale"))
+
 # xgbGrid <- expand.grid(gamma = 0,
 #                        min_child_weight = 1,
 #                        nrounds = 300,
@@ -146,24 +167,9 @@ start_xgb <- Sys.time()
 #              data = train_set,
 #              method = "xgbTree",
 #              tuneGrid = xgbGrid,
-#              trControl = fitControl,
+#              trControl = trainControl(method = "none"),
 #              preProcess = c("center", "scale"))
-
-xgbGrid <- expand.grid(gamma = 0,
-                       min_child_weight = 1,
-                       nrounds = 300,
-                       max_depth = 7,
-                       eta = 0.3,
-                       colsample_bytree = 0.8,
-                       subsample = 1)
-
-fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
-             data = train_set,
-             method = "xgbTree",
-             tuneGrid = xgbGrid,
-             trControl = trainControl(method = "none"),
-             preProcess = c("center", "scale"))
-
+# 
 
 # add movie and user bias calculated from the train_set and make predictions
 # mutate is to put 0 where we don't have a calculated movie_time_bias
