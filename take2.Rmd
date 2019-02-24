@@ -9,6 +9,11 @@ Overall approach is to create an ensemble of predictions from three different mo
 library(tidyverse)
 library(caret)
 library(lubridate)
+library(doParallel)
+
+# setup for 6 core parallel processing (only 32 RAM)
+cl <- makePSOCKcluster(6)
+registerDoParallel(cl)
 
 
 edx <- readRDS(file = "./rda/edx.rds")
