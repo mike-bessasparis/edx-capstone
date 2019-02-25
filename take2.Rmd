@@ -1,26 +1,22 @@
 ---
 title: "R Notebook"
 output: html_notebook
----
-
-Overall approach is to create an ensemble of predictions from three different models (custom NetFlix, XGBoost, and NeuralNet) and average the ratings together for each movie to create a final prediciton.
+--- 
 
 ``` {r}
+
 library(tidyverse)
 library(caret)
 library(lubridate)
 library(doParallel)
 
-# setup for 6 core parallel processing (only 32 RAM)
-cl <- makePSOCKcluster(6)
+# setup for parallel processing 
+cl <- makePSOCKcluster(8)
 registerDoParallel(cl)
 
 
 edx <- readRDS(file = "./rda/edx.rds")
 validation <- readRDS (file = "./rda/validation.rds")
-
-#edx <- readRDS(file = "./rda/small_edx.rds")
-#validation <- readRDS (file = "./rda/small_Validation.rds")
 
 ```
 
@@ -149,32 +145,40 @@ rmse_custom <- RMSE(pred_custom$pred_c, test_set$rating)
 Selection of features was made over many previous interations of train() using a small sample of the train_set.  The final set of features showed the best promise of working well on the entire data set.  The model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.  I use train() here for convenience.
 ``` {r}
 
+cl <- makePSOCKcluster(8)
+registerDoParallel(cl)
+
 start_xgb <- Sys.time()
 
-set.seed(1)
-fitControl <- trainControl(method = "cv", number = 5)
-
-fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
-             data = train_set,
-             method = "xgbTree",
-             trControl = fitControl,
-             preProcess = c("center", "scale"))
-
-# xgbGrid <- expand.grid(gamma = 0,
-#                        min_child_weight = 1,
-#                        nrounds = 300,
-#                        max_depth = 7,
-#                        eta = 0.3,
-#                        colsample_bytree = 0.8,
-#                        subsample = 1)
+# set.seed(1)
+# fitControl <- trainControl(method = "cv", number = 5)
+#
+# # choose sample of train_set to tune parameters, 
+# # don't have enough computing resources to use the entire train_set
+# probe_set <- sample_n(train_set, 1000000)
 # 
-# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
-#              data = train_set,
+# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
+#              data = probe_set,
 #              method = "xgbTree",
 #              tuneGrid = xgbGrid,
-#              trControl = trainControl(method = "none"),
+#              trControl = fitControl,
 #              preProcess = c("center", "scale"))
 # 
+xgbGrid <- expand.grid(gamma = 0,
+                       min_child_weight = 1,
+                       nrounds = 200,
+                       max_depth = 3,
+                       eta = 0.3,
+                       colsample_bytree = 0.8,
+                       subsample = 1)
+
+fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
+             data = train_set,
+             method = "xgbTree",
+             tuneGrid = xgbGrid,
+             trControl = trainControl(method = "none"),
+             preProcess = c("center", "scale"))
+
 
 # add movie and user bias calculated from the train_set and make predictions
 # mutate is to put 0 where we don't have a calculated movie_time_bias
@@ -195,6 +199,8 @@ pred_xgb <- pred_xgb %>%
 ensemble_preds <- ensemble_preds %>% 
   left_join(pred_xgb, by = c("userId", "movieId"))
 
+rmse_xgb <- RMSE(pred_xgb$pred_x, test_set$rating)
+
 rm(test_set_working, xgbGrid, q, pred_xgb, start_xgb)
 
 ```
@@ -204,17 +210,24 @@ rm(test_set_working, xgbGrid, q, pred_xgb, start_xgb)
 Model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.
 ```{r}
 
+# setup for parallel processing 
+cl <- makePSOCKcluster(8)
+registerDoParallel(cl)
 start_nnet <- Sys.time()
 
+# choose sample of train_set to tune parameters,
+# don't have enough computing resources to use the entire train_set
+# probe_set <- sample_n(train_set, 1000000)
+# 
 # fitControl <- trainControl(method = "cv", number = 5)
 # 
-# fit <- train(rating ~ b_u + b_i_time + num_of_reviews_of_movie,
-#              data = train_set,
+# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
+#              data = probe_set,
 #              method = "nnet",
-#              trControl = fitControl, 
+#              trControl = fitControl,
 #              preProcess = c("center", "scale"),
 #              linout = TRUE)
-# 
+
 
 nnetGrid <- expand.grid(size = 3,
                        decay = 1e-4)
@@ -246,6 +259,8 @@ pred_nnet <- pred_nnet %>%
 
 ensemble_preds <- ensemble_preds %>% 
   left_join(pred_nnet, by = c("userId", "movieId"))
+
+rmse_nnet <- RMSE(pred_nnet$pred_n, test_set$rating)
 
 rm(nnetGrid, fit, q, pred_nnet, test_set_working, start_nnet)
 
