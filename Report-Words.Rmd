@@ -13,19 +13,20 @@ Goal of project was to reinforce past learning, find solutions to real-world dat
 ## Methods
 a methods/analysis section that explains the process and techniques used, such as data cleaning, data exploration and visualization, any insights gained, and your modeling approach
 
-There are very few predictors in the edx dataset.  I depended heavily on prior published work with the dataset to define various additional predictors.
+There are few predictors in the edx dataset.  I depended heavily on prior published work with the dataset to define various additional predictors.
 
-I choose an ensemble model.  I did not have the ocmputing resources to analyze the entire data.  I had to work with various sample sizes.  I felt that using several different types of models with these samples and choosing the average had the best chance of being most correct.
+I choose an ensemble model: a simplified version of Netflix, XGBoost, and NNET.  I felt that using several different types of models with these samples and choosing the average had the best chance of being most correct.  I did not have the computing resources to analyze the entire data.  I had to work with various sample sizes.  For example, in order to tune parameters for XGBoost and NNET I used a random sample of 1 million observations.  I assume that the sample is representative of the full dataset well enough to result in a reasonably good choice of parameters.
 
 ## Results
 a results section
 
 ## Conclusion
 I learned a lot:
+
  * How to work with large dataset (sampling, model parameter guessing)
  * Microsoft Azure virtual machines
- * Paralellism in R (doParallel) - Parallel process speeds up some things a lot.  I had 8 cores available but not enough RAM (only 32GB) to use them all on the entire dataset.
- * Enhanced knowledge of git version control.  I created a VM on Azure to do heavy duty processing.  But, as that cost money, I used my local (small) PC for non-computational-expensive things.  I developed methods for data exploration, visualization on a very small dataset locally.  Only when they appearing to offer insights did I execute them on my Azure VM with the entire dataset.
+ * Paralellism in R (`doParallel` package) - Parallel process speeds up some things a lot.  I had 8 cores available but not enough RAM (only 32GB) to use them all on the entire dataset.
+ * Enhanced knowledge of git version control.  I created a VM on Azure to do heavy duty processing.  But, as that cost money, I used my local (small) PC for non-computational-expensive things.  I developed methods for data exploration, visualization on a very small dataset locally.  Only when they appear to offer insights did I execute them on my Azure VM with the entire dataset.
 
 
 
