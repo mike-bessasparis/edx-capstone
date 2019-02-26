@@ -172,7 +172,7 @@ xgbGrid <- expand.grid(gamma = 0,
                        colsample_bytree = 0.8,
                        subsample = 1)
 
-fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
+fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
              data = train_set,
              method = "xgbTree",
              tuneGrid = xgbGrid,
@@ -233,7 +233,7 @@ nnetGrid <- expand.grid(size = 3,
                        decay = 1e-4)
 
 # train model using previously identified parameters
-fit <- train(rating ~ b_u + b_i_time + num_of_reviews_of_movie,
+fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
              data = train_set,
              method = "nnet",
              tuneGrid = nnetGrid,

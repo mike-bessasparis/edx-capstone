@@ -398,6 +398,76 @@ edx_working %>%
 
 ```
 
+## Proposed predictors
+```{r}
+
+edx_working <- edx
+
+# create a reviewed_date and reviewed_year feature
+edx_working <- edx_working %>%
+  mutate(review_date = date(as_datetime(timestamp)),
+         review_year = year(review_date))
+
+mu <- mean(edx_working$rating)
+
+
+# find b_i(t), the rating bias for each movie as a function of time (year)
+lambda1 <- 3
+movie_time_bias <- edx_working %>% 
+  group_by(movieId, review_year) %>% 
+  summarize(b_i_time = sum(rating - mu) / (n() + lambda1))
+edx_working <- left_join(edx_working, movie_time_bias, by = c("movieId", "review_year"))
+
+# find the user rating bias for each user
+lambda2 <- 5
+user_bias <- edx_working %>% 
+  group_by(userId) %>% 
+  summarize(b_u = sum(rating - mu - b_i_time) / (n() + lambda2) )
+edx_working <- left_join(edx_working, user_bias, by = "userId")
+
+
+
+# create released_year and movie_age_at_rating features
+edx_working <- edx_working %>%
+  mutate(movie_release_year = as.integer(str_extract(str_extract(title, "\\(\\d{4}\\)"), "\\d{4}")),
+         movie_age_at_rating = year(review_date) - movie_release_year)
+
+
+# Create the number of times a movie has been reviewed predictor
+q <- edx_working %>% 
+  group_by(movieId) %>% 
+  summarise(num_of_reviews_of_movie = n())
+
+edx_working <- edx_working %>%
+  left_join(q, by = "movieId")
+
+
+
+rm(lambda1, lambda2, q)
+
+```
+
+
+
+
+
+## Pairwise correlations amoung proposed predictors
+```{r}
+
+edx_matrix <- edx_working %>% 
+  select(rating, b_i_time, b_u, review_year, movie_age_at_rating, num_of_reviews_of_movie, movie_release_year) %>% 
+  as.matrix()
+
+c <- cor(edx_matrix)
+
+corrplot::corrplot(c, method = "number", type = "lower")
+
+```
+First thing we notice is that the two strongest predicors of rating are the item and user biases.  They don't correlate with each other so we will use both of them in any model.  We see that the proposed predicotrs `movie_release_year` and `movie_age_at_rating` are strongly negatively correlated.  This makes sense as movies released in years far in the past are older!  Neither is better correlated with `rating` so we'll use `movie_age_at_rating` since it's a positive correlation and to me it seems more intuitive.
+
+We'll use all proposed predictors except `review_year` and `movie_release_year` in our models.
+
+
 
 
 ```{r echo = FALSE, results = "hide"}
@@ -408,5 +478,6 @@ rm(edx_working, q, mu, NAcol, t)
 gc()
 
 ```
+
 
 
