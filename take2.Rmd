@@ -44,6 +44,10 @@ RMSE <- function(true_ratings, predicted_ratings) {
 }
 
 
+# remove comment when running for final validation
+test_set <- validation
+
+
 rm(edx, removed, test_index, temp)
 ```
 
@@ -120,13 +124,15 @@ This is the model we started in class.  I copied the method from the class and e
 
 # r = mu + b_i(t) + b_u
 
+
 # add movie and user bias calculated from the train_set and make predictions
 # mutate is to put 0 where we don't have a calculated movie_time_bias
-pred_custom <- test_set %>% 
-  left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
-  mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
-  left_join(user_bias, by = "userId") %>% 
+pred_custom <- test_set %>%
+  left_join(movie_time_bias, by = c("movieId", "review_year")) %>%
+  mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%
+  left_join(user_bias, by = "userId") %>%
   mutate(pred_c = mu + b_i_time + b_u)
+
 
 # recover predictions outside of rating range
 pred_custom <- pred_custom %>% 
@@ -139,10 +145,12 @@ ensemble_preds <- ensemble_preds %>%
 
 rmse_custom <- RMSE(pred_custom$pred_c, test_set$rating)
 
+rm(pred_custom)
+
 ```
 
 ## XGBoost
-Selection of features was made over many previous interations of train() using a small sample of the train_set.  The final set of features showed the best promise of working well on the entire data set.  The model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.  I use train() here for convenience.
+Selection of features was made over many previous interations of train() using a small sample of the train_set.  The final set of features showed the best promise of working well on the entire data set.  The model has been previously trained to optimize parameters.  Code is included at the end of this notebook for completeness.  I use train() here for convenience.
 ``` {r}
 
 cl <- makePSOCKcluster(8)
@@ -250,6 +258,16 @@ test_set_working <- test_set %>%
 
 q <- predict(fit, test_set_working)
 
+#
+# for final validation only
+#
+# test_set_working <- validation %>% 
+#   left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
+#   mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
+#   left_join(user_bias, by = "userId")
+# 
+# q <- predict(fit, test_set_working)
+
 pred_nnet <- data.frame(userId = test_set_working$userId, movieId = test_set_working$movieId, pred_n = q)
 
 # recover predictions outside of rating range
@@ -272,9 +290,18 @@ rm(nnetGrid, fit, q, pred_nnet, test_set_working, start_nnet)
 ensemble_preds <- ensemble_preds %>% 
   mutate (final_pred = (pred_c + pred_x + pred_n) / 3)
 
-RMSE_ensemble <- RMSE(validation$rating, ensemble_preds$final_pred)
+#
+# for final model development only
+#
+RMSE_ensemble <- RMSE(test_set$rating, ensemble_preds$final_pred)
 
-rm(movie_time_bias, user_bias, mu, train_set, test_set, edx, validation, RMSE)
+
+#
+# for final validation only
+#
+#RMSE_ensemble <- RMSE(validation$rating, ensemble_preds$final_pred)
+
+rm(movie_time_bias, user_bias, mu, train_set, test_set, edx, validation, RMSE, cl)
 
 ```
 
