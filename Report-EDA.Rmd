@@ -1,9 +1,9 @@
 ---
 title: "Report - Exploratory Data Analysis"
 output:
+  html_notebook: default
   html_document:
     df_print: paged
-  html_notebook: default
   pdf_document: default
 ---
 
@@ -64,8 +64,6 @@ movieId_by_genre <- edx %>%
   separate_rows(genres, sep = "\\|")
 
 ```
-
-
 
 ## Response Variable
 ```{r echo = FALSE}
@@ -246,8 +244,6 @@ edx %>%
 
 ```
 
-
-
 ### Timestamp
 ```{r echo = FALSE}
 
@@ -302,7 +298,6 @@ edx_working %>%
 
 ***
 ## Possible Predictors to Create
-
 How does rating change related to the `movie's age` at the time of the review?  For reference, the dashed horizontal line is the overall average rating.  There are several data points that show reviews **before** the release date.  Perhaps these are bad data points or were reviewed by critics prior to being released.
 ```{r echo = FALSE, message = FALSE}
 
@@ -446,10 +441,6 @@ edx_working <- edx_working %>%
 rm(lambda1, lambda2, q)
 
 ```
-
-
-
-
 
 ## Pairwise correlations amoung proposed predictors
 ```{r}

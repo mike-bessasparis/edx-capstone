@@ -3,22 +3,31 @@ title: "Data Science: Capstone"
 output: html_notebook
 ---
 
-The report that documents the analysis and presents the findings, along with supporting statistics and figures. The report is written in English and uploaded. The report should include the RMSE generated. The report includes at least the following sections:
-
 ## Executive Summary
-an introduction/overview/executive summary section that describes the dataset and summarizes the goal of the project and key steps that were performed
+The explicit goal of project is to accurately predict the rating users will give to movies.  This is really motivation to reinforce past learning, find solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.  This project was also motivation to explore the features of R Markdown.
 
-Goal of project was to reinforce past learning, find solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.
+The key steps are importing the dataset, creating and tuning a model, and evaluating the model against an "unknown" dataset.  The raw data was imported using the provided script.  This script creates an edx dataset used to build a model and a validation dataset used for final evaluation.  I split the edx dataset into a train_set and a test_set in order to avoid making any modelling decisions with the validation set.  Then model parameters are tuned and evaluated against the test_set.  Finally, the model makes predictions for the users and movies in the previously unseen validation set to obtain the final RMSE score.
 
 ## Methods
 a methods/analysis section that explains the process and techniques used, such as data cleaning, data exploration and visualization, any insights gained, and your modeling approach
 
-There are few predictors in the edx dataset.  I depended heavily on prior published work with the dataset to define various additional predictors.
+The data required no cleaning.  There were no missing values and all existing values appeared reasonable.  I depended heavily on prior published work with the dataset (*The BellKor Solution to the Netflix Grand Prize*, Yehuda Koren, August 2009) to guide additional predictor creation and visualization. 
 
-I choose an ensemble model: a simplified version of Netflix, XGBoost, and NNET.  I felt that using several different types of models with these samples and choosing the average had the best chance of being most correct.  I did not have the computing resources to analyze the entire data.  I had to work with various sample sizes.  For example, in order to tune parameters for XGBoost and NNET I used a random sample of 1 million observations.  I assume that the sample is representative of the full dataset well enough to result in a reasonably good choice of parameters.
+I choose an ensemble model with three sub-models: a very simplified version of BellKor Netflix solution (referred to as the "custom" built model) that extends the model developed during class, a tree-based gradient boosting model (XGBoost), and a nerual network model (NNET).  I did not have the computing resources to analyze the entire data.  I had to work with various sample sizes.  For example, in order to tune parameters for XGBoost and NNET I used a random sample of 1 million observations.  I assume that the sample is representative of the full dataset well enough to result in a reasonably good choice of parameters.
 
 ## Results
-a results section
+The ensemble pruduced predictions wiht an RMSE of 0.8606.  I was able to achieve an RMSE of 0.8606 which meets the required RMSE using only the model provided in class.  However, since my goal was to explore and practice I implemented the full ensemble of three.  The XGBoost and NNET models performed only slightly better than the custom model:
+
+| Model | RMSE |
+|-------|------|
+| Custom | 0.8623 |
+| XGBoost | 0.8609 |
+| NNet | 0.8608 |
+| Ensemble | 0.8606 |
+
+This surprised me despite Bell and Koren's concluding remarks on baseline predictors:
+
+> Out of the numerous new algorithmic contributions, I would like to highlight one – those humble baseline predictors (or biases), which capture main effects in the data. While the literature mostly concentrates on the more sophisticated algorithmic aspects, we have learned that an accurate treatment of main effects is probably at least as significant as coming up with modeling breakthroughs.
 
 ## Conclusion
 I learned a lot:
@@ -28,11 +37,6 @@ I learned a lot:
  * Paralellism in R (`doParallel` package) - Parallel process speeds up some things a lot.  I had 8 cores available but not enough RAM (only 32GB) to use them all on the entire dataset.
  * Enhanced knowledge of git version control.  I created a VM on Azure to do heavy duty processing.  But, as that cost money, I used my local (small) PC for non-computational-expensive things.  I developed methods for data exploration, visualization on a very small dataset locally.  Only when they appear to offer insights did I execute them on my Azure VM with the entire dataset.
 
+The detailed exploratory data analysis follows.
 
 
-0 points: The report is either not uploaded or contains very minimal information.
-20 points: Multiple required sections of the report are missing.
-25 points: One required section of the report is missing.
-30 points: The report includes all required sections, but the report is significantly difficult to follow or missing significant supporting detail in multiple sections.
-35 points: The report includes all required sections, but the report is difficult to follow or missing supporting detail in one section (or has minor flaws in multiple sections).
-40 points: The report includes all required sections and is easy to follow with good supporting detail throughout.
