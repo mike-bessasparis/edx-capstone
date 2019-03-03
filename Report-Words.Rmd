@@ -16,7 +16,7 @@ The data required no cleaning.  There were no missing values and all existing va
 I choose an ensemble model with three sub-models: a very simplified version of BellKor Netflix solution (referred to as the "custom" built model) that extends the model developed during class, a tree-based gradient boosting model (XGBoost), and a nerual network model (NNET).  I did not have the computing resources to analyze the entire data.  I had to work with various sample sizes.  For example, in order to tune parameters for XGBoost and NNET I used a random sample of 1 million observations.  I assume that the sample is representative of the full dataset well enough to result in a reasonably good choice of parameters.
 
 ## Results
-The ensemble pruduced predictions wiht an RMSE of 0.8606.  I was able to achieve an RMSE of 0.8606 which meets the required RMSE using only the model provided in class.  However, since my goal was to explore and practice I implemented the full ensemble of three.  The XGBoost and NNET models performed only slightly better than the custom model:
+The ensemble pruduced predictions with an RMSE of 0.8606.  I was able to achieve an RMSE of 0.8606 which meets the required RMSE using only the model provided in class.  However, since my goal was to explore and practice I implemented the full ensemble of three.  The XGBoost and NNET models performed only slightly better than the custom model:
 
 | Model | RMSE |
 |-------|------|
@@ -34,7 +34,7 @@ I learned a lot:
 
  * How to work with large dataset (sampling, model parameter guessing)
  * Microsoft Azure virtual machines
- * Paralellism in R (`doParallel` package) - Parallel process speeds up some things a lot.  I had 8 cores available but not enough RAM (only 32GB) to use them all on the entire dataset.
+ * Paralellism in R (`doParallel` package)
  * Enhanced knowledge of git version control.  I created a VM on Azure to do heavy duty processing.  But, as that cost money, I used my local (small) PC for non-computational-expensive things.  I developed methods for data exploration, visualization on a very small dataset locally.  Only when they appear to offer insights did I execute them on my Azure VM with the entire dataset.
 
 The detailed exploratory data analysis follows.

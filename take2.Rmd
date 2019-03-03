@@ -18,6 +18,14 @@ registerDoParallel(cl)
 edx <- readRDS(file = "./rda/edx.rds")
 validation <- readRDS (file = "./rda/validation.rds")
 
+# important to not use validation data during model development
+# to keep the code uncluttered I use this to decide what should be
+# used as the test_set rather than changing datasets for each model.
+# set the type of model run here by removing a comment
+#
+#type_of_run <- "validation"
+type_of_run <- "develop"
+
 ```
 
 Use the edx data as the base to create a train_set and test_set.
@@ -44,8 +52,9 @@ RMSE <- function(true_ratings, predicted_ratings) {
 }
 
 
-# remove comment when running for final validation
-test_set <- validation
+# use the test_set to evaluate model when we're building the model
+# use the validation data to evaluate the completed model
+test_set <- if_else(type_of_run == "develop", test_set, validation)
 
 
 rm(edx, removed, test_index, temp)
@@ -75,6 +84,8 @@ movie_time_bias <- train_set %>%
   group_by(movieId, review_year) %>% 
   summarize(b_i_time = sum(rating - mu) / (n() + lambda1))
 train_set <- left_join(train_set, movie_time_bias, by = c("movieId", "review_year"))
+
+
 
 # find the user rating bias for each user
 lambda2 <- 5
@@ -118,8 +129,8 @@ rm(lambda1, lambda2, q)
 ```
 
 ## Custom Model (Netflix)
-This is the model we started in class.  I copied the method from the class and extended that model using the reference provided in the class: 
-"The BellKor Solution to the Netflix Grand Prize", Yehuda Koren, August 2009.  I implemented only a simplified version of the movie bias as a function of time referenced in the paper.  I correct for estimates outside the given rating range of 0.5 - 5.
+This is the model we started in class.  I copied the method from the class and extended that model using the reference provided in the class: "The BellKor Solution to the Netflix Grand Prize", Yehuda Koren, August 2009.  I implemented only a simplified version of the movie bias as a function of time referenced in the paper.  I correct for estimates outside the given rating range of 0.5 - 5.
+
 ``` {r}
 
 # r = mu + b_i(t) + b_u
@@ -158,20 +169,6 @@ registerDoParallel(cl)
 
 start_xgb <- Sys.time()
 
-# set.seed(1)
-# fitControl <- trainControl(method = "cv", number = 5)
-#
-# # choose sample of train_set to tune parameters, 
-# # don't have enough computing resources to use the entire train_set
-# probe_set <- sample_n(train_set, 1000000)
-# 
-# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
-#              data = probe_set,
-#              method = "xgbTree",
-#              tuneGrid = xgbGrid,
-#              trControl = fitControl,
-#              preProcess = c("center", "scale"))
-# 
 xgbGrid <- expand.grid(gamma = 0,
                        min_child_weight = 1,
                        nrounds = 200,
@@ -223,20 +220,6 @@ cl <- makePSOCKcluster(8)
 registerDoParallel(cl)
 start_nnet <- Sys.time()
 
-# choose sample of train_set to tune parameters,
-# don't have enough computing resources to use the entire train_set
-# probe_set <- sample_n(train_set, 1000000)
-# 
-# fitControl <- trainControl(method = "cv", number = 5)
-# 
-# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
-#              data = probe_set,
-#              method = "nnet",
-#              trControl = fitControl,
-#              preProcess = c("center", "scale"),
-#              linout = TRUE)
-
-
 nnetGrid <- expand.grid(size = 3,
                        decay = 1e-4)
 
@@ -257,16 +240,6 @@ test_set_working <- test_set %>%
   left_join(user_bias, by = "userId")
 
 q <- predict(fit, test_set_working)
-
-#
-# for final validation only
-#
-# test_set_working <- validation %>% 
-#   left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
-#   mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
-#   left_join(user_bias, by = "userId")
-# 
-# q <- predict(fit, test_set_working)
 
 pred_nnet <- data.frame(userId = test_set_working$userId, movieId = test_set_working$movieId, pred_n = q)
 
@@ -305,9 +278,15 @@ rm(movie_time_bias, user_bias, mu, train_set, test_set, edx, validation, RMSE, c
 
 ```
 
-### manual cross-validation code used to tune parameters for user and movie bias.
+
 ```{r eval = FALSE}
 
+# # # # # # 
+#
+# manual cross-validation code used to tune parameters for user and movie bias.
+#
+# # # # # # 
+#
 # cv_splits <- createFolds(train_set$rating, k = 5, returnTrain = FALSE)
 # 
 # mjb <- data.frame(matrix(nrow = 0, ncol = 3))
@@ -355,6 +334,49 @@ rm(movie_time_bias, user_bias, mu, train_set, test_set, edx, validation, RMSE, c
 # 
 # mjb <- arrange(mjb, rmse)
 # print(mjb)
+
+
+
+# # # # # #
+#
+# code used to tune parameters for XGBoost model
+#
+# # # # # #
+#
+# set.seed(1)
+# fitControl <- trainControl(method = "cv", number = 5)
+#
+# # choose sample of train_set to tune parameters, 
+# # don't have enough computing resources to use the entire train_set
+# probe_set <- sample_n(train_set, 1000000)
+# 
+# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
+#              data = probe_set,
+#              method = "xgbTree",
+#              tuneGrid = xgbGrid,
+#              trControl = fitControl,
+#              preProcess = c("center", "scale"))
+# 
+
+
+
+# # # # # #
+#
+# code used to tune parameters for NNet model
+#
+# # # # # #
+#
+# set.seed(1)
+# probe_set <- sample_n(train_set, 1000000)
+# 
+# fitControl <- trainControl(method = "cv", number = 5)
+# 
+# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
+#              data = probe_set,
+#              method = "nnet",
+#              trControl = fitControl,
+#              preProcess = c("center", "scale"),
+#              linout = TRUE)
 
 
 ```
