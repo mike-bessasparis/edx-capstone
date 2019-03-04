@@ -30,12 +30,15 @@ This surprised me despite Bell and Koren's concluding remarks on baseline predic
 > Out of the numerous new algorithmic contributions, I would like to highlight one – those humble baseline predictors (or biases), which capture main effects in the data. While the literature mostly concentrates on the more sophisticated algorithmic aspects, we have learned that an accurate treatment of main effects is probably at least as significant as coming up with modeling breakthroughs.
 
 ## Conclusion
-I learned a lot:
+In conclusion, I was able to successfully create a model that meets the RMSE requirement.  I learned a lot during this process:
 
- * How to work with large dataset (sampling, model parameter guessing)
- * Microsoft Azure virtual machines
- * Paralellism in R (`doParallel` package)
- * Enhanced knowledge of git version control.  I created a VM on Azure to do heavy duty processing.  But, as that cost money, I used my local (small) PC for non-computational-expensive things.  I developed methods for data exploration, visualization on a very small dataset locally.  Only when they appear to offer insights did I execute them on my Azure VM with the entire dataset.
+ * How to work with large dataset (sampling, model parameter guessing).  The 10 million records in the dataset are much too large for me to work with directly when exploring the data or developing the model.  Choosing smaller samples (from 10,000 to 1 million) was critical.
+ 
+ * Microsoft Azure virtual machines.  My home computer was fine during the course.  But, it is unable to create the edx or validation sets.  My only option was to create a more powerful virtual machine - I choose Microsoft's Azure environment.  My final virtual machine had 8 processors and 32 GB of memory.  More powerful machines were available but their cost was prohibitive.
+ 
+ * Parallel processing in R (`doParallel` package).  I learned that R does have the packages to support multiple CPUs.  This was especially useful during Caret training to determine the optimum model parameters.  Evaluating parameters went from 10-15 hours to 2-3 hours.
+ 
+ * Finally, I enhanced my knowledge of Git distributed version control.  Using the Atlassian Sourcetree frontend for Git along with Github was essential for me to complete this project.  I could not have effectively worked on the same codebase using my physical home PC and the Azure VM without a central respository.  Not only did it allow me access from several computers, it saved me countless times by allowing me to revert to previous code versions after a long wlk down a dead-end development path.
 
 The detailed exploratory data analysis follows.
 

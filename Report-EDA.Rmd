@@ -18,10 +18,6 @@ library(lubridate)
 edx <- readRDS(file = "./rda/edx.rds")
 # validation <- readRDS (file = "./rda/Validation.rds")
 
-#edx <- readRDS(file = "./rda/small_edx.rds")
-#validation <- readRDS (file = "./rda/small_Validation.rds")
-
-
 ```
 
 ***
@@ -393,7 +389,7 @@ edx_working %>%
 
 ```
 
-## Proposed predictors
+## Proposed final predictors
 ```{r}
 
 edx_working <- edx
@@ -457,9 +453,6 @@ corrplot::corrplot(c, method = "number", type = "lower")
 First thing we notice is that the two strongest predicors of rating are the item and user biases.  They don't correlate with each other so we will use both of them in any model.  We see that the proposed predicotrs `movie_release_year` and `movie_age_at_rating` are strongly negatively correlated.  This makes sense as movies released in years far in the past are older!  Neither is better correlated with `rating` so we'll use `movie_age_at_rating` since it's a positive correlation and to me it seems more intuitive.
 
 We'll use all proposed predictors except `review_year` and `movie_release_year` in our models.
-
-
-
 
 ```{r echo = FALSE, results = "hide"}
 
