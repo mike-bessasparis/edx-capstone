@@ -11,7 +11,7 @@ library(lubridate)
 library(doParallel)
 
 # setup for parallel processing 
-cl <- makePSOCKcluster(8)
+cl <- makePSOCKcluster(6)
 registerDoParallel(cl)
 
 
@@ -21,10 +21,6 @@ validation <- readRDS (file = "./rda/validation.rds")
 # important to not use validation data during model development
 # to keep the code uncluttered I use this to decide what should be
 # used as the test_set rather than changing datasets for each model.
-# set the type of model run here by removing a comment
-#
-#type_of_run <- "validation"
-type_of_run <- "develop"
 
 ```
 
@@ -53,8 +49,8 @@ RMSE <- function(true_ratings, predicted_ratings) {
 
 
 # use the test_set to evaluate model when we're building the model
-# use the validation data to evaluate the completed model
-test_set <- if_else(type_of_run == "develop", test_set, validation)
+# use the validation data (uncomment the following line) to evaluate the completed model
+test_set <- validation
 
 
 rm(edx, removed, test_index, temp)
@@ -164,9 +160,6 @@ rm(pred_custom)
 Selection of features was made over many previous interations of train() using a small sample of the train_set.  The final set of features showed the best promise of working well on the entire data set.  The model has been previously trained to optimize parameters.  Code is included at the end of this notebook for completeness.  I use train() here for convenience.
 ``` {r}
 
-cl <- makePSOCKcluster(8)
-registerDoParallel(cl)
-
 start_xgb <- Sys.time()
 
 xgbGrid <- expand.grid(gamma = 0,
@@ -215,9 +208,6 @@ rm(test_set_working, xgbGrid, q, pred_xgb, start_xgb)
 Model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.
 ```{r}
 
-# setup for parallel processing 
-cl <- makePSOCKcluster(8)
-registerDoParallel(cl)
 start_nnet <- Sys.time()
 
 nnetGrid <- expand.grid(size = 3,
@@ -263,16 +253,7 @@ rm(nnetGrid, fit, q, pred_nnet, test_set_working, start_nnet)
 ensemble_preds <- ensemble_preds %>% 
   mutate (final_pred = (pred_c + pred_x + pred_n) / 3)
 
-#
-# for final model development only
-#
 RMSE_ensemble <- RMSE(test_set$rating, ensemble_preds$final_pred)
-
-
-#
-# for final validation only
-#
-#RMSE_ensemble <- RMSE(validation$rating, ensemble_preds$final_pred)
 
 rm(movie_time_bias, user_bias, mu, train_set, test_set, edx, validation, RMSE, cl)
 
