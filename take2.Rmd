@@ -3,6 +3,19 @@ title: "R Notebook"
 output: html_notebook
 --- 
 
+General Organization:
+
+  build datasets
+  
+  for each model {
+    train using train_set
+    predict using eval_set (test_set during model development, validation during final run)
+    add prediction to ensemble
+  }
+  
+  evaluate ensemble
+  
+
 ``` {r}
 
 library(tidyverse)
@@ -128,7 +141,6 @@ rm(lambda1, lambda2, q)
 
 ## Custom Model (Netflix)
 This is the model we started in class.  I copied the method from the class and extended that model using the reference provided in the class: "The BellKor Solution to the Netflix Grand Prize", Yehuda Koren, August 2009.  I implemented only a simplified version of the movie bias as a function of time referenced in the paper.  I correct for estimates outside the given rating range of 0.5 - 5.
-
 ``` {r}
 
 # r = mu + b_i(t) + b_u
