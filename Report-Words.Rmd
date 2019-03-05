@@ -4,7 +4,7 @@ output: html_notebook
 ---
 
 ## Executive Summary
-The explicit goal of project is to accurately predict the rating users will give to movies.  This is really motivation to reinforce past learning, find solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.  This project was also motivation to explore the features of R Markdown.
+The explicit goal of the project is to accurately predict the rating users will give to movies.  This is the motivation to reinforce past learning, find solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.  This project was also motivation for me to explore the features of R Markdown.
 
 The key steps are importing the dataset, creating and tuning a model, and evaluating the model against an "unknown" dataset.  The raw data was imported using the provided script.  This script creates an edx dataset used to build a model and a validation dataset used for final evaluation.  I split the edx dataset into a train_set and a test_set in order to avoid making any modelling decisions with the validation set.  Then model parameters are tuned and evaluated against the test_set.  Finally, the model makes predictions for the users and movies in the previously unseen validation set to obtain the final RMSE score.
 
@@ -20,10 +20,10 @@ The ensemble pruduced predictions with an RMSE of 0.8606.  I was able to achieve
 
 | Model | RMSE |
 |-------|------|
+| Ensemble | 0.8606 |
 | Custom | 0.8623 |
 | XGBoost | 0.8609 |
 | NNet | 0.8608 |
-| Ensemble | 0.8606 |
 
 This surprised me despite Bell and Koren's concluding remarks on baseline predictors:
 

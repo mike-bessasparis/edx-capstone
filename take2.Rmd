@@ -1,21 +1,42 @@
 ---
-title: "R Notebook"
+title: "edX Data Science Capstone, Model"
 output: html_notebook
 --- 
 
-General Organization:
+General Organization of the Code:
 
-  build datasets
-  
-  for each model {
-    train using train_set
-    predict using eval_set (test_set during model development, validation during final run)
-    add prediction to ensemble
-  }
-  
-  evaluate ensemble
-  
 
+* Build the datasets
+* For each model 
+    - Train
+    - Generate predictions
+    - Add to ensemble
+* Evaluate the ensemble to generate the final predictions.
+
+
+First we build the datasets.  I used the provided script which downloads the raw
+data and takes care of correctly building the edx and validation datasets.  I
+saved these as .rds objects.  I then take the edx dataset and split it into a
+train and test set.  I ignore the validation set until the final model run thru.
+
+It's important not to use the validation data during model development.  So, I
+substitute the generic variable "eval_set" in the models where we would, in
+class, use the variable "test_set".  While developing the model I set eval_set
+equal to test_set.  But, when running the final validation I set eval_set equal
+to validation.
+
+I built the code to be modular in order to accept additional models.  This makes
+it easier to plug-in additional models without damaging the code's overall
+structure [^1].  So, for each model I train using the train_set, predict using
+the test_set during model development and the validation during final the run,
+and add the preditcion to the ensemble. Finally, I evaluate the ensemble by
+taking the average of each model's prediction.
+
+
+[^1]: Indeed, during development I swapped in/out several models.  In the early stages I was experimenting. Several of the models didn't run well enough given my computing resources to be included.  Others, such as the "Recommender Labs" package, I wasn't able to get very good results from - certainly due to my inexperience.
+
+***
+## Build the datasets
 ``` {r}
 
 library(tidyverse)
@@ -35,7 +56,7 @@ validation <- readRDS (file = "./rda/validation.rds")
 
 ```
 
-Use the edx data as the base to create a train_set and test_set.
+#### Create train_set and test_set
 ``` {r}
 
 # test_set set will be 10% of edx data
@@ -71,8 +92,8 @@ eval_set <- test_set
 rm(edx, removed, test_index, temp)
 ```
 
-## Feature Engineering (from EDA)
-Add interesting features discovered from EDA.  As a convenience I add features to both the train_set and test_set here in one place.  The lambda parameters used in the movie and user bias calculations have been tuned by a 5-fold cross-validation done using only the train_set outside of this report.  The cross-validation code is included (but not run) at the end of this report.  
+#### Feature Engineering (from EDA)
+Add interesting features discovered from EDA.  As a convenience I add features to both the train_set and test_set here in one place.  The lambda parameters used in the movie and user bias calculations have been tuned by a 5-fold cross-validation done using only the train_set prior to this execution.  The cross-validation code is included (but not run) at the end of this report.  
 ``` {r}
 
 # create a reviewed_date and reviewed_year feature
@@ -138,9 +159,14 @@ ensemble_preds <- eval_set %>%
 rm(lambda1, lambda2, q)
 
 ```
+***
+## Run individual models to populate the ensemble
+#### Custom Model (Netflix)
+This is the model we started in class.  I copied the method from the class and extended that model using the paper referenced in the class.[^2]   I implemented only a simplified version of the movie bias as a function of time referenced in the paper.  I correct for estimates outside the given rating range of 0.5 - 5.
 
-## Custom Model (Netflix)
-This is the model we started in class.  I copied the method from the class and extended that model using the reference provided in the class: "The BellKor Solution to the Netflix Grand Prize", Yehuda Koren, August 2009.  I implemented only a simplified version of the movie bias as a function of time referenced in the paper.  I correct for estimates outside the given rating range of 0.5 - 5.
+Given user u, rating movie i, at time t, my prediction r, is: $$r_{ui}=\mu+b_{i(t)}+b_u$$
+
+[^2]: "The BellKor Solution to the Netflix Grand Prize", Yehuda Koren, August 2009.
 ``` {r}
 
 # r = mu + b_i(t) + b_u
@@ -170,7 +196,7 @@ rm(pred_custom)
 
 ```
 
-## XGBoost
+#### XGBoost
 Selection of features to include in this model was made over many previous interations of train() using a small sample of the train_set.  The final set of features showed the best promise of working well on the entire data set.  The model has been previously trained to optimize parameters.  Code is included at the end of this notebook for completeness.  I use train() here, instead of calling XGBoost directly, for convenience.
 ``` {r}
 
@@ -217,8 +243,7 @@ rm(eval_set_working, xgbGrid, q, pred_xgb, start_xgb)
 
 ```
 
-
-## Neural Network
+#### Neural Network
 Model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.
 ```{r}
 
@@ -261,8 +286,8 @@ rm(nnetGrid, fit, q, pred_nnet, eval_set_working, start_nnet)
 
 ```
 
-
-## Use ensemble to create final predictions
+***
+## Evaluate the ensemble to generate the final predictions
 ```{r}
 
 ensemble_preds <- ensemble_preds %>% 
@@ -274,12 +299,13 @@ rm(movie_time_bias, user_bias, mu, train_set, eval_set, edx, validation, RMSE, c
 
 ```
 
-
+***
+## Appendix: Previously run code used to tune parameters
 ```{r eval = FALSE}
 
 # # # # # # 
 #
-# manual cross-validation code used to tune parameters for user and movie bias.
+# cross-validation code used to tune lambda parameters for user and movie bias.
 #
 # # # # # # 
 #
@@ -373,7 +399,7 @@ rm(movie_time_bias, user_bias, mu, train_set, eval_set, edx, validation, RMSE, c
 #              trControl = fitControl,
 #              preProcess = c("center", "scale"),
 #              linout = TRUE)
-
+#
 
 ```
 
