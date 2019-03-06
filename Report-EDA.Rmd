@@ -1,10 +1,10 @@
 ---
 title: "Report - Exploratory Data Analysis"
 output:
-  html_notebook: default
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
+  html_notebook: default
 ---
 
 ---
@@ -58,6 +58,11 @@ A detailed exploratory data analysis follows.
 library(tidyverse)
 library(ggthemes)
 library(lubridate)
+library(doParallel)
+
+# setup for parallel processing 
+cl <- makePSOCKcluster(6)
+registerDoParallel(cl)
 
 edx <- readRDS(file = "./rda/edx.rds")
 
@@ -80,7 +85,6 @@ head(edx)
 Do any variables contain missing values?
 ```{r echo = FALSE}
 
-edx_working <- edx
 NAcol <- which(colSums(is.na(edx)) > 0)
 
 ```
@@ -101,6 +105,8 @@ edx_100k <- sample_n(edx, 100000)
 movieId_by_genre <- edx %>%
   select(movieId, rating, genres) %>%
   separate_rows(genres, sep = "\\|")
+
+num_genres <- length(unique(movieId_by_genre$genres))
 
 ```
 
@@ -150,7 +156,7 @@ q %>% ggplot(aes(x = half_star, y = rating, fill = half_star)) +
 ## Other Variables
 In the dataset there are:
 
-- **`r length(unique(movieId_by_genre$genres))`** unique movie genres.
+- **`r num_genres`** unique movie genres.
 - **`r length(unique(edx$userId))`** unique users
 - **`r length(unique(edx$movieId))`** unique movies rated
 
@@ -196,11 +202,11 @@ movieId_by_genre %>%
           axis.ticks.y.left = element_line(),
           axis.ticks.x.bottom = element_blank())
 
-
+rm(movieId_by_genre)
 ```
 
 ### Users
-Movies Reviewed by Users, truncated to show only left side of the distribution.
+Movies Reviewed by Users, truncated to show only the left side of the extremely right-skewed distribution.
 ```{r echo = FALSE, message = FALSE}
 
 q <- edx %>% 
@@ -433,7 +439,7 @@ edx_working %>%
 ```
 
 ## Proposed final predictors
-```{r}
+```{r echo = FALSE}
 
 edx_working <- edx
 
@@ -482,7 +488,7 @@ rm(lambda1, lambda2, q)
 ```
 
 ## Pairwise correlations amoung proposed predictors
-```{r}
+```{r echo = FALSE}
 
 edx_matrix <- edx_working %>% 
   select(rating, b_i_time, b_u, review_year, movie_age_at_rating, num_of_reviews_of_movie, movie_release_year) %>% 
