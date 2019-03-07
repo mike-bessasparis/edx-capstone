@@ -8,7 +8,7 @@ output:
 ---
 
 ---
-title: "Data Science: Capstone"
+title: "Data Science: Capstone, Report to Colleagues"
 output: html_notebook
 ---
 
