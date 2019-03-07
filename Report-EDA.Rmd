@@ -49,6 +49,8 @@ In conclusion, I was able to successfully create a model that meets the RMSE req
  
  * Finally, I enhanced my knowledge of Git distributed version control.  Using the Atlassian Sourcetree frontend for Git along with Github was essential for me to complete this project.  I could not have effectively worked on the same codebase using my physical home PC and the Azure VM without a central respository.  Not only did it allow me access from several computers, it saved me countless times by allowing me to revert to previous code versions after a long wlk down a dead-end development path.
 
+There are several improvements to consider for improvements.  I would include the movie Genre as a predictor.  Perhaps as a component of the movie bias but also perhaps as a component to the user bias.  I would implement user bias as a function of time as in the Netflix competition model.  Finally, I would consider the number of movies a user reviews together (also part of the Netflix model) as a possible predictor.
+
 A detailed exploratory data analysis follows.
 
 
