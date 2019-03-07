@@ -8,12 +8,12 @@ output:
 ---
 
 ---
-title: "Data Science: Capstone, Report to Colleagues"
+title: "Data Science: Capstone Report"
 output: html_notebook
 ---
 
 ## Executive Summary
-The goal of this project is to accurately predict the rating users will give to movies.  This is the motivation to reinforce past learning and to explorer solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.  Personally, this project was also motivation for me to explore the features of R Markdown that I have not used in the past.
+Data Science Course Colleagues, the goal of this project is to accurately predict the rating users will give to movies.  This is the motivation to reinforce past learning and to explorer solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.  Personally, this project was also motivation for me to explore the features of R Markdown that I have not used in the past.
 
 The key steps are importing the dataset, creating and tuning a model, and evaluating the model against an "unknown" dataset.  The raw data was imported using the provided script.  This script creates an edx dataset used to build a model and a validation dataset used for final evaluation.  I split the edx dataset into a train_set and a test_set in order to avoid making any modelling decisions with the validation set.  Then model parameters are tuned and evaluated against the test_set.  Finally, the model makes predictions for the users and movies in the previously unseen validation set to obtain the final RMSE score.
 
