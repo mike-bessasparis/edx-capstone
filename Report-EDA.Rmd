@@ -1,21 +1,12 @@
 ---
-title: "Report - Exploratory Data Analysis"
-output:
-  pdf_document: default
-  html_document:
-    df_print: paged
-  html_notebook: default
----
-
----
 title: "Data Science: Capstone Report"
 output: html_notebook
 ---
 
 ## Executive Summary
-Data Science Course Colleagues, the goal of this project is to accurately predict the rating users will give to movies.  This is the motivation to reinforce past learning and to explorer solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.  Personally, this project was also motivation for me to explore the features of R Markdown that I have not used in the past.
+Data Science Course Colleagues, the goal of this project is to accurately predict the rating users will give to movies with a RMSE less than 0.87750.  This is the motivation to reinforce past learning and to explorer solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.  Personally, this project was also motivation for me to explore the features of R Markdown that I have not used in the past.
 
-The key steps are importing the dataset, creating and tuning a model, and evaluating the model against an "unknown" dataset.  The raw data was imported using the provided script.  This script creates an edx dataset used to build a model and a validation dataset used for final evaluation.  I split the edx dataset into a train_set and a test_set in order to avoid making any modelling decisions with the validation set.  Then model parameters are tuned and evaluated against the test_set.  Finally, the model makes predictions for the users and movies in the previously unseen validation set to obtain the final RMSE score.
+The key steps are importing the dataset, creating and tuning a model, and evaluating the model against an "unknown" dataset.  The raw data was imported using the provided script.  This script creates an edx dataset used to build a model and a validation dataset used for final evaluation.  I split the edx dataset into a train_set and a test_set in order to avoid making any modelling decisions with the validation set.  Then model parameters are tuned and evaluated against the test_set.  Finally, the model makes predictions for the users and movies in the previously unseen validation set to obtain the final RMSE score of 0.8606 meeting the requirement.
 
 ## Methods
 The data required no cleaning.  There were no missing values and all existing values appeared reasonable.  I depended heavily on prior published work with the dataset (*The BellKor Solution to the Netflix Grand Prize*, Yehuda Koren, August 2009) to guide additional predictor creation and visualization. 
@@ -187,22 +178,6 @@ Which movies did not have a genre listed?
 
 edx %>% filter(genres == "(no genres listed)")
 
-```
-
-What is the relationship between Genre and Rating?
-```{r echo = FALSE}
-
-movieId_by_genre %>% 
-  ggplot() +
-    geom_boxplot(aes(x = genres, y = rating)) +
-    coord_flip() +
-    theme_economist_white() +
-    theme(axis.text.y.left = element_text(hjust = 1),
-          panel.grid.major = element_blank(),
-          axis.ticks.y.left = element_line(),
-          axis.ticks.x.bottom = element_blank())
-
-rm(movieId_by_genre)
 ```
 
 ### Users
