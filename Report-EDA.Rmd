@@ -1,20 +1,22 @@
 ---
-title: "Data Science: Capstone Report"
-output: html_notebook
+title: 'Data Science: Capstone Report'
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 ## Executive Summary
-Data Science Course Colleagues, the goal of this project is to accurately predict the rating users will give to movies with a RMSE less than 0.87750.  This is the motivation to reinforce past learning and to explorer solutions to real-world data-science problems not covered in class, e.g., large datasets, limited computing resources, and changing requirements.  Personally, this project was also motivation for me to explore the features of R Markdown that I have not used in the past.
+Data Science Course Colleagues, the goal of this project is to accurately predict the rating users will give to movies with a RMSE less than 0.87750.  This is the motivation to reinforce past learning and to explorer solutions to real-world data-science problems not covered in class, e.g., large data sets, limited computing resources, and changing requirements.  Personally, this project was also motivation for me to explore the features of R Markdown that I have not used in the past.
 
-The key steps are importing the dataset, creating and tuning a model, and evaluating the model against an "unknown" dataset.  The raw data was imported using the provided script.  This script creates an edx dataset used to build a model and a validation dataset used for final evaluation.  I split the edx dataset into a train_set and a test_set in order to avoid making any modelling decisions with the validation set.  Then model parameters are tuned and evaluated against the test_set.  Finally, the model makes predictions for the users and movies in the previously unseen validation set to obtain the final RMSE score of 0.8606 meeting the requirement.
+The key steps are importing the data set, creating and tuning a model, and evaluating the model against an "unknown" data set.  The raw data was imported using the provided script.  This script creates an edx data set used to build a model and a validation data set used for final evaluation.  I split the edx data set into a train_set and a test_set in order to avoid making any modelling decisions with the validation set.  Then model parameters are tuned and evaluated against the test_set.  Finally, the model makes predictions for the users and movies in the previously unseen validation set to obtain the final RMSE score of 0.8606 meeting the requirement.
 
 ## Methods
-The data required no cleaning.  There were no missing values and all existing values appeared reasonable.  I depended heavily on prior published work with the dataset (*The BellKor Solution to the Netflix Grand Prize*, Yehuda Koren, August 2009) to guide additional predictor creation and visualization. 
+The data required no cleaning.  There were no missing values and all existing values appeared reasonable.  I depended heavily on prior published work with the data set (*The BellKor Solution to the Netflix Grand Prize*, Yehuda Koren, August 2009) to guide additional predictor creation and visualization. 
 
-I choose an ensemble model with three sub-models: a very simplified version of BellKor Netflix solution (referred to as the "custom" built model) that extends the model developed during class, a tree-based gradient boosting model (XGBoost), and a nerual network model (NNET).  I did not have the computing resources to analyze the entire data.  I had to work with various sample sizes.  For example, in order to tune parameters for XGBoost and NNET I used a random sample of 1 million observations.  I assume that the sample represents the full dataset well enough to result in a reasonably good choice of parameters.
+I choose an ensemble model with three sub-models: a very simplified version of BellKor Netflix solution (referred to as the "custom" built model) that extends the model developed during class, a tree-based gradient boosting model (XGBoost), and a neural network model (NNET).  I did not have the computing resources to analyze the entire data.  I had to work with various sample sizes.  For example, in order to tune parameters for XGBoost and NNET I used a random sample of 1 million observations.  I assume that the sample represents the full data set well enough to result in a reasonably good choice of parameters.
 
 ## Results
-The ensemble pruduced predictions with an RMSE of 0.8606.  I was able to achieve an RMSE of 0.8606 which meets the required RMSE using only the model provided in class.  However, since my goal was to explore and practice I implemented the full ensemble of three.  The XGBoost and NNET models performed only slightly better than the custom model:
+The ensemble produced predictions with an RMSE of 0.8606.  I was able to achieve an RMSE of 0.8606 which meets the required RMSE using only the model provided in class.  However, since my goal was to explore and practice I implemented the full ensemble of three.  The XGBoost and NNET models performed only slightly better than the custom model:
 
 | Model | RMSE |
 |-------|------|
@@ -30,13 +32,13 @@ This surprised me despite Bell and Koren's concluding remarks on baseline predic
 ## Conclusion
 In conclusion, I was able to successfully create a model that meets the RMSE requirement.  I learned a lot during this project:
 
- * How to work with large dataset (sampling, model parameter guessing).  The 10 million records in the dataset are much too large for me to work with directly when exploring the data or developing the model.  Choosing smaller samples (from 10,000 to 1 million) was critical.
+ * How to work with large data set (sampling, model parameter guessing).  The 10 million records in the data set are much too large for me to work with directly when exploring the data or developing the model.  Choosing smaller samples (from 10,000 to 1 million) was critical.
  
  * Microsoft Azure virtual machines.  My home computer was fine during the course.  But, it is unable to create the edx or validation sets.  My only option was to create a more powerful virtual machine - I choose Microsoft's Azure environment.  My final virtual machine had 8 processors and 32 GB of memory.  More powerful machines were available but their cost was prohibitive.
  
  * Parallel processing in R (`doParallel` package).  I learned that R does have the packages to support multiple CPUs.  This was especially useful during Caret training to determine the optimum model parameters.  Evaluating parameters went from 10-15 hours to 2-3 hours.
  
- * Finally, I enhanced my knowledge of Git distributed version control.  Using the Atlassian Sourcetree frontend for Git along with Github was essential for me to complete this project.  I could not have effectively worked on the same codebase using my physical home PC and the Azure VM without a central respository.  Not only did it allow me access from several computers, it saved me countless times by allowing me to revert to previous code versions after a long wlk down a dead-end development path.
+ * Finally, I enhanced my knowledge of Git distributed version control.  Using the Atlassian Sourcetree front end for Git along with Github was essential for me to complete this project.  I could not have effectively worked on the same codebase using my physical home PC and the Azure VM without a central repository.  Not only did it allow me access from several computers, it saved me countless times by allowing me to revert to previous code versions after a long walk down a dead-end development path.
 
 There are several improvements to consider for improvements.  I would include the movie Genre as a predictor.  Perhaps as a component of the movie bias but also perhaps as a component to the user bias.  I would implement user bias as a function of time as in the Netflix competition model.  Finally, I would consider the number of movies a user reviews together (also part of the Netflix model) as a possible predictor.
 
@@ -56,6 +58,7 @@ cl <- makePSOCKcluster(6)
 registerDoParallel(cl)
 
 edx <- readRDS(file = "./rda/edx.rds")
+final_rmse <- readRDS(file = "./rda/final-rmse.rds")
 
 ```
 
@@ -64,7 +67,7 @@ edx <- readRDS(file = "./rda/edx.rds")
 ## Summary
 The data is from the GroupLens research lab at the University of Minnesota.  The data consists of **`r nrow(edx)`** observations of **`r length(edx)`** variables. The data spans the years from **`r year(min(as_datetime(edx$timestamp)))`** to **`r year(max(as_datetime(edx$timestamp)))`**.
 
-The `userId` variable is an integer representation of an actual MovieLens userId which has been anonymized to protect privacy.  The `movieId` is the actual MovieLens ID.  Ratings are made on a 5-star scale with half-star increments.  Timestamps represent seconds since midnight Coordinated Universal Time (UTC) of January 1, 1970.  The title includes the title and year the movie was released.  The `genres` variable is a concatenation of all genres which apply to a specific movie.
+The `userId` variable is an integer representation of an actual MovieLens userId which has been anonymized to protect privacy.  The `movieId` is the actual MovieLens ID.  Ratings are made on a 5-star scale with half-star increments.  Time-stamps represent seconds since midnight Coordinated Universal Time (UTC) of January 1, 1970.  The title includes the title and year the movie was released.  The `genres` variable is a concatenation of all genres which apply to a specific movie.
 ```{r echo = FALSE}
 
 summary(edx)
@@ -83,8 +86,8 @@ There are `r length(which(colSums(is.na(edx)) > 0))` columns with at least one N
 
 There are no labels that are ordinal and should be encoded as a number.
 
-We will convert `userId` and `movieId` from an integer to a factor.  We'll also separate the `genres` and store this result in a new dataframe - we'll need to refer to this dataframe a couple of times and don't want to redo this computationally expensive process.  We'll create a `review_date` variable from `timestamp` for the same reason.
-```{r echo = FALSE}
+We will convert `userId` and `movieId` from an integer to a factor.  We'll also separate the `genres` and store this result in a new data frame - we'll need to refer to this data frame a couple of times and don't want to redo this computationally expensive process.  We'll create a `review_date` variable from `timestamp` for the same reason.
+```{r echo = FALSE, message = FALSE}
 
 edx <- edx %>%
   mutate(userId = factor(userId),
@@ -131,23 +134,11 @@ edx_100k %>%
     labs(title = "Ratings", subtitle = "Random sample of 100k ratings") +
   theme_economist_white()
 
-q <- edx %>% 
-  mutate(half_star = if_else(review_date > ymd("2003-05-01"), TRUE, FALSE))
-
-q %>% ggplot(aes(x = half_star, y = rating, fill = half_star)) +
-    geom_boxplot() +
-    labs(title = "Early Ratings vs Modern Ratings", subtitle = "No real difference") +
-    scale_fill_manual(values = c("#990000", "#588300")) +
-    scale_x_discrete(name = NULL, labels = c("Half-Stars Not Allowed", "Half-Stars OK")) +
-    theme_economist_white() +
-    theme(legend.position = "none")
-
 ```
 
 ## Other Variables
-In the dataset there are:
+In the data set there are:
 
-- **`r num_genres`** unique movie genres.
 - **`r length(unique(edx$userId))`** unique users
 - **`r length(unique(edx$movieId))`** unique movies rated
 
@@ -160,16 +151,18 @@ group_by(genres) %>%
 summarise(count = n()) %>%
 ggplot() +
   geom_col(aes(x = reorder(genres, -count), y = count), fill = "#1380A1", color = "white") +
-  coord_flip() +
   xlab("Genre") +
   ylab("Number of Movies") +
   labs(title = "Movies in Each Genre") +
   scale_y_continuous(labels = scales::comma) +
+  geom_hline(aes(yintercept = 0)) +
   theme_economist_white() +
   theme(axis.text.y.left = element_text(hjust = 1),
+        axis.text.x = element_text(angle = 90, hjust = 1),
         panel.grid.major = element_blank(),
         axis.ticks.y.left = element_line(),
-        axis.ticks.x.bottom = element_blank())
+        axis.ticks.x.bottom = element_blank(),
+        axis.line = element_blank())
 
 ```
 
@@ -246,6 +239,7 @@ edx %>%
   summarise(user_bias = mean(rating - mu)) %>% 
   ggplot() +
     geom_density(aes(x = user_bias), fill = "#1380A1") +
+    labs(title = "User Bias") +
     theme_economist_white()
 
 ```
@@ -387,7 +381,6 @@ edx_working %>%
   ggplot(aes(x = num_of_reviews_of_movie, y = avg_rating)) +
     geom_point(color = "grey") +
     geom_smooth(se = FALSE, color = "#1380A1") +
-#    geom_hline(yintercept = mu, linetype = "dashed") +
     scale_x_continuous(labels = scales::comma) +
     theme_economist_white()
 
@@ -463,7 +456,7 @@ rm(lambda1, lambda2, q)
 ```
 
 ## Pairwise correlations amoung proposed predictors
-```{r echo = FALSE}
+```{r echo = FALSE, messages = FALSE}
 
 edx_matrix <- edx_working %>% 
   select(rating, b_i_time, b_u, review_year, movie_age_at_rating, num_of_reviews_of_movie, movie_release_year) %>% 
@@ -474,7 +467,7 @@ c <- cor(edx_matrix)
 corrplot::corrplot(c, method = "number", type = "lower")
 
 ```
-First thing we notice is that the two strongest predicors of rating are the item and user biases.  They don't correlate with each other so we will use both of them in any model.  We see that the proposed predicotrs `movie_release_year` and `movie_age_at_rating` are strongly negatively correlated.  This makes sense as movies released in years far in the past are older!  Neither is better correlated with `rating` so we'll use `movie_age_at_rating` since it's a positive correlation and to me it seems more intuitive.
+First thing we notice is that the two strongest predictors of rating are the item and user biases.  They don't correlate with each other so we will use both of them in any model.  We see that the proposed predictors `movie_release_year` and `movie_age_at_rating` are strongly negatively correlated.  This makes sense as movies released in years far in the past are older!  Neither is better correlated with `rating` so we'll use `movie_age_at_rating` since it's a positive correlation and to me it seems more intuitive.
 
 We'll use all proposed predictors except `review_year` and `movie_release_year` in our models.
 

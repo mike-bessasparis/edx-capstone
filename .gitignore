@@ -10,6 +10,7 @@
 *.Rproj
 .RDataTmp
 .RDataTmp1
+*.pdf
 train.csv
 validation.csv
 train-tiny.csv
