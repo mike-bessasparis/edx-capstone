@@ -6,7 +6,6 @@ output: html_notebook
 ***
 ## General Organization of the Code:
 
-
 * Build the data sets
 * For each model 
     - Train
@@ -347,9 +346,14 @@ RMSE_ensemble <- RMSE(eval_set$rating, ensemble_preds$final_pred)
 print(RMSE_ensemble)
 
 # save the final RMSE for use in the report
-saveRDS(RMSE_ensemble, "./rda/final-rmse.rds")
+m <- c("Ensemble", "Custom", "XGBoost", "NNet")
+rmse <- round(c(RMSE_ensemble, rmse_custom, rmse_xgb, rmse_nnet), 4)
+rmse_df <- data_frame(m, rmse)
 
-rm(movie_time_bias, user_bias, mu, train_set, eval_set, edx, 
+saveRDS(rmse_df, "./rda/final-rmse.rds")
+
+
+rm(movie_time_bias, user_bias, mu, train_set, eval_set, edx,
    validation, RMSE, cl, ensemble_preds, test_set)
 
 gc()
