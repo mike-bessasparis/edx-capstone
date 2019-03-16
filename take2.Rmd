@@ -39,10 +39,10 @@ taking the average of each model's prediction.
 ## Build the data sets
 ``` {r}
 
-library(tidyverse)
-library(caret)
-library(lubridate)
-library(doParallel)
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
+if(!require(doParallel)) install.packages("doParallel", repos = "http://cran.us.r-project.org")
 
 # setup for parallel processing 
 cl <- makePSOCKcluster(6)
