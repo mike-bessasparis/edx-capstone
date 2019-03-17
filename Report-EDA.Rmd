@@ -8,11 +8,64 @@ output:
 
 ```{r echo=FALSE, results='hide', message = FALSE}
 
-library(tidyverse)
-library(ggthemes)
-library(lubridate)
+if(!require(tidyverse)) install.packages("tidyverse", 
+                                         repos = "http://cran.us.r-project.org")
+if(!require(ggthemes)) install.packages("ggthemes", 
+                                        repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("lubridate", 
+                                         repos = "http://cran.us.r-project.org")
+if(!require(corrplot)) install.packages("corrplot", 
+                                        repos = "http://cran.us.r-project.org")
 
-edx <- readRDS(file = "./rda/edx.rds")
+
+#############################################################
+# Create edx set, validation set, and submission file
+#############################################################
+
+# Note: this process could take a couple of minutes
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- read.table(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                      col.names = c("userId", "movieId", "rating", "timestamp"))
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))[movieId],
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+
+set.seed(1)
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+
+validation <- temp %>% 
+     semi_join(edx, by = "movieId") %>%
+     semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+
+
 final_rmse <- readRDS(file = "./rda/final-rmse.rds")
 
 ```
@@ -193,7 +246,7 @@ ggplot() +
   geom_hline(aes(yintercept = 0)) +
   theme_economist_white() +
   theme(axis.text.y.left = element_text(hjust = 1),
-        axis.text.x = element_text(angle = 90, hjust = 1),
+        axis.text.x = element_text(angle = 90, hjust = 0),
         panel.grid.major = element_blank(),
         axis.ticks.y.left = element_line(),
         axis.ticks.x.bottom = element_blank(),
@@ -503,7 +556,7 @@ rm(lambda1, lambda2, q)
 
 ```
 
-## Pairwise correlations amoung proposed predictors
+## Pairwise correlations among proposed predictors
 ```{r echo = FALSE, messages = FALSE}
 
 edx_matrix <- edx_working %>% 
@@ -512,7 +565,7 @@ edx_matrix <- edx_working %>%
 
 c <- cor(edx_matrix)
 
-corrplot::corrplot(c, method = "number", type = "lower")
+corrplot(c, method = "number", type = "lower")
 
 ```
 First thing we notice is that the two strongest predictors of rating are the item and user biases.  They don't correlate with each other so we will use both of them in any model.  We see that the proposed predictors `movie_release_year` and `movie_age_at_rating` are strongly negatively correlated.  This makes sense as movies released in years far in the past are older!  Neither is better correlated with `rating` so we'll use `movie_age_at_rating` since it's a positive correlation and to me it seems more intuitive.
@@ -523,7 +576,7 @@ We'll use all proposed predictors except `review_year` and `movie_release_year` 
 
 #Clean up
 
-rm(edx_working, q, mu, NAcol, t)
+rm(edx_working, mu, NAcol, t)
 gc()
 
 ```
