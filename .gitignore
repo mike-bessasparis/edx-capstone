@@ -10,9 +10,11 @@
 *.Rproj
 .RDataTmp
 .RDataTmp1
-*.pdf
 train.csv
 validation.csv
 train-tiny.csv
 report_files
 submission.csv
+Report_cache/
+Report-EDA_cache/
+Report-EDA_files/

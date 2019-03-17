@@ -1,0 +1,464 @@
+---
+title: "edX Data Science Capstone, Model"
+output: html_notebook
+--- 
+
+***
+## General Organization of the Code:
+
+* Build the data sets
+* For each model 
+    - Train
+    - Generate predictions
+    - Add to ensemble
+* Evaluate the ensemble to generate the final predictions
+* Save final predictions to ./rda/final_rmse.rds for use in the report
+
+
+First we build the data sets.  I used the provided script which downloads the raw
+data and takes care of correctly building the edx and validation data sets.  I
+saved these as .rds objects.  I then take the edx data set and split it into a
+train and test set.  I ignore the validation set until the final model run thru.
+
+It's important not to use the validation data during model development.  So, I
+substitute the generic variable "eval_set" in the models where we would, in
+class, use the variable "test_set".  While developing the model I set eval_set
+equal to test_set.  But, when running the final validation I set eval_set equal
+to validation.
+
+I built the code to be modular in order to accept additional models.  This makes
+it easier to plug-in additional models without damaging the code's overall
+structure [^1].  So, for each model I train using the train_set, predict using
+the test_set during model development and the validation during final the run,
+and add the prediction to the ensemble. Finally, I evaluate the ensemble by
+taking the average of each model's prediction.
+
+
+[^1]: Indeed, during development I swapped in/out several models.  In the early stages I was experimenting. Several of the models didn't run well enough given my computing resources to be included.  Others, such as the "Recommender Labs" package, I wasn't able to get very good results from - certainly due to my inexperience.
+
+***
+## Build the data sets
+``` {r}
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
+if(!require(doParallel)) install.packages("doParallel", repos = "http://cran.us.r-project.org")
+
+# setup for parallel processing 
+cl <- makePSOCKcluster(6)
+registerDoParallel(cl)
+
+
+#############################################################
+# Create edx set, validation set, and submission file
+#############################################################
+
+# Note: this process could take a couple of minutes
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- read.table(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                      col.names = c("userId", "movieId", "rating", "timestamp"))
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))[movieId],
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+
+set.seed(1)
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+
+validation <- temp %>% 
+     semi_join(edx, by = "movieId") %>%
+     semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+
+```
+
+#### Create train_set and test_set
+``` {r}
+
+# test_set set will be 10% of edx data
+set.seed(1)
+test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.1, list = FALSE)
+train_set <- edx[-test_index,]
+temp <- edx[test_index,]
+
+# Make sure userId and movieId in test_set are also in train_set
+test_set <- temp %>% 
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, test_set)
+train_set <- rbind(train_set, removed)
+
+
+RMSE <- function(true_ratings, predicted_ratings) {
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+
+# important to not use validation data during model development
+# I substitute the variable "eval_set" in the models where we would, in class,
+# use the variable "test_set".
+#
+# use the test_set to evaluate model when we're building the model
+# use the validation data to evaluate the final model
+#eval_set <- test_set
+ eval_set <- validation
+
+
+rm(edx, removed, test_index, temp)
+```
+
+#### Feature Engineering (from EDA)
+Add interesting features discovered from EDA.  As a convenience I add features to both the train_set and test_set here in one place.  The lambda parameters used in the movie and user bias calculations have been tuned by a 5-fold cross-validation done using only the train_set prior to this execution.  The cross-validation code is included (but not run) at the end of this report.  
+``` {r}
+
+# create a reviewed_date and reviewed_year feature
+train_set <- train_set %>%
+  mutate(review_date = date(as_datetime(timestamp)),
+         review_year = year(review_date))
+eval_set <- eval_set %>%
+  mutate(review_date = date(as_datetime(timestamp)),
+         review_year = year(review_date))
+
+
+
+mu <- mean(train_set$rating)
+
+
+
+# find b_i(t), the rating bias for each movie as a function of time (year)
+lambda1 <- 3
+movie_time_bias <- train_set %>% 
+  group_by(movieId, review_year) %>% 
+  summarize(b_i_time = sum(rating - mu) / (n() + lambda1))
+train_set <- left_join(train_set, movie_time_bias, by = c("movieId", "review_year"))
+
+
+
+# find the user rating bias for each user
+lambda2 <- 5
+user_bias <- train_set %>% 
+  group_by(userId) %>% 
+  summarize(b_u = sum(rating - mu - b_i_time) / (n() + lambda2) )
+train_set <- left_join(train_set, user_bias, by = "userId")
+
+
+
+# create released_year and movie_age_at_rating features
+train_set <- train_set %>%
+  mutate(movie_release_year = as.integer(str_extract(str_extract(title, "\\(\\d{4}\\)"), "\\d{4}")),
+         movie_age_at_rating = year(review_date) - movie_release_year)
+eval_set <- eval_set %>%
+  mutate(movie_release_year = as.integer(str_extract(str_extract(title, "\\(\\d{4}\\)"), "\\d{4}")),
+         movie_age_at_rating = year(review_date) - movie_release_year)
+
+
+
+# Create the number of times a movie has been reviewed predictor
+q <- train_set %>% 
+  group_by(movieId) %>% 
+  summarise(num_of_reviews_of_movie = n())
+
+train_set <- train_set %>%
+  left_join(q, by = "movieId")
+eval_set <- eval_set %>% 
+  left_join(q, by = "movieId")
+
+
+
+# create ensemble dataframe to record individual model predictions
+ensemble_preds <- eval_set %>% 
+  select(userId, movieId)
+
+
+
+rm(lambda1, lambda2, q)
+
+```
+***
+## Run individual models to populate the ensemble
+#### Custom Model (Netflix)
+This is the model we started in class.  I copied the method from the class and extended that model using the paper referenced in the class.[^2]   I implemented only a simplified version of the movie bias as a function of time referenced in the paper.  I correct for estimates outside the given rating range of 0.5 - 5.
+
+Given user u, rating movie i, at time t, my prediction r, is: $$r_{ui}=\mu+b_{i(t)}+b_u$$
+
+[^2]: "The BellKor Solution to the Netflix Grand Prize", Yehuda Koren, August 2009.
+``` {r}
+
+# r = mu + b_i(t) + b_u
+
+
+# add movie and user bias calculated from the train_set and make predictions
+# mutate is to put 0 where we don't have a calculated movie_time_bias
+pred_custom <- eval_set %>%
+  left_join(movie_time_bias, by = c("movieId", "review_year")) %>%
+  mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%
+  left_join(user_bias, by = "userId") %>%
+  mutate(pred_c = mu + b_i_time + b_u)
+
+
+# recover predictions outside of rating range
+pred_custom <- pred_custom %>% 
+  select(userId, movieId, pred_c) %>% 
+  mutate(pred_c = if_else(pred_c > 5, 5, pred_c),
+         pred_c = if_else(pred_c < 0.5, 0.5, pred_c))
+
+ensemble_preds <- ensemble_preds %>% 
+  left_join(pred_custom, by = c("userId", "movieId"))
+
+rmse_custom <- RMSE(pred_custom$pred_c, eval_set$rating)
+
+rm(pred_custom)
+
+```
+
+#### XGBoost
+Selection of features to include in this model was made over many previous iterations of train() using a small sample of the train_set.  The final set of features showed the best promise of working well on the entire data set.  The model has been previously trained to optimize parameters.  Code is included at the end of this notebook for completeness.  I use train() here, instead of calling XGBoost directly, for convenience.
+``` {r}
+
+start_xgb <- Sys.time()
+
+xgbGrid <- expand.grid(gamma = 0,
+                       min_child_weight = 1,
+                       nrounds = 200,
+                       max_depth = 3,
+                       eta = 0.3,
+                       colsample_bytree = 0.8,
+                       subsample = 1)
+
+fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
+             data = train_set,
+             method = "xgbTree",
+             tuneGrid = xgbGrid,
+             trControl = trainControl(method = "none"),
+             preProcess = c("center", "scale"))
+
+
+# add movie and user bias calculated from the train_set and make predictions
+# mutate is to put 0 where we don't have a calculated movie_time_bias
+eval_set_working <- eval_set %>% 
+  left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
+  mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
+  left_join(user_bias, by = "userId")
+
+q <- predict(fit, eval_set_working)
+
+pred_xgb <- data.frame(userId = eval_set_working$userId, movieId = eval_set_working$movieId, pred_x = q)
+
+# recover predictions outside of rating range
+pred_xgb <- pred_xgb %>% 
+  mutate(pred_x = if_else(pred_x > 5, 5, pred_x),
+         pred_x = if_else(pred_x < 0.5, 0.5, pred_x))
+
+ensemble_preds <- ensemble_preds %>% 
+  left_join(pred_xgb, by = c("userId", "movieId"))
+
+rmse_xgb <- RMSE(pred_xgb$pred_x, eval_set$rating)
+
+rm(eval_set_working, xgbGrid, q, pred_xgb, start_xgb)
+
+```
+
+#### Neural Network
+Model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.
+```{r}
+
+start_nnet <- Sys.time()
+
+nnetGrid <- expand.grid(size = 3,
+                       decay = 1e-4)
+
+# train model using parameters previously optimized on the train_set
+fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie,
+             data = train_set,
+             method = "nnet",
+             tuneGrid = nnetGrid,
+             trControl = trainControl(method = "none"),
+             preProcess = c("center", "scale"),
+             linout = TRUE)
+
+# add movie and user bias calculated from the train_set and make predictions
+# mutate is to put 0 where we don't have a calculated movie_time_bias
+eval_set_working <- eval_set %>% 
+  left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
+  mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
+  left_join(user_bias, by = "userId")
+
+q <- predict(fit, eval_set_working)
+
+pred_nnet <- data.frame(userId = eval_set_working$userId, movieId = eval_set_working$movieId, pred_n = q)
+
+# recover predictions outside of rating range
+pred_nnet <- pred_nnet %>% 
+  mutate(pred_n = if_else(pred_n > 5, 5, pred_n),
+         pred_n = if_else(pred_n < 0.5, 0.5, pred_n))
+
+ensemble_preds <- ensemble_preds %>% 
+  left_join(pred_nnet, by = c("userId", "movieId"))
+
+rmse_nnet <- RMSE(pred_nnet$pred_n, eval_set$rating)
+
+rm(nnetGrid, fit, q, pred_nnet, eval_set_working, start_nnet)
+
+```
+
+***
+## Evaluate the ensemble to generate the final predictions
+```{r}
+
+ensemble_preds <- ensemble_preds %>% 
+  mutate (final_pred = (pred_c + pred_x + pred_n) / 3)
+
+RMSE_ensemble <- RMSE(eval_set$rating, ensemble_preds$final_pred)
+
+print(RMSE_ensemble)
+
+# save the final RMSE for use in the report
+m <- c("Ensemble", "Custom", "XGBoost", "NNet")
+rmse <- round(c(RMSE_ensemble, rmse_custom, rmse_xgb, rmse_nnet), 4)
+rmse_df <- data_frame(m, rmse)
+
+if (!dir.exists("./rda")) {
+        dir.create("./rda")
+}
+        
+saveRDS(rmse_df, "./rda/final-rmse.rds")
+
+rm(movie_time_bias, user_bias, mu, train_set, eval_set,
+   validation, RMSE, cl, ensemble_preds, test_set)
+rm(m, rmse_custom, rmse_nnet, rmse_xgb, RMSE_ensemble, rmse)
+
+gc()
+```
+
+***
+## Appendix: Previously run code used to tune parameters
+```{r eval = FALSE}
+
+# # # # # # 
+#
+# cross-validation code used to tune lambda parameters for user and movie bias.
+#
+# # # # # # 
+#
+# cv_splits <- createFolds(train_set$rating, k = 5, returnTrain = FALSE)
+# 
+# mjb <- data.frame(matrix(nrow = 0, ncol = 3))
+# 
+# for (lambda1 in 1:24) {
+#   print(paste("lambda1", lambda1))
+#   for (lambda2 in 1:9) {
+#         r <- numeric()
+#         print(paste("..lambda2", lambda2))
+#         for (i in 1:length(cv_splits)) {
+#           print(paste("....fold", i))
+#           test_i <- unlist(cv_splits[i])
+#           cv_test_set <- train_set[test_i,]
+#           cv_train_set <- train_set[-test_i,]
+#           
+#             # find b_i(t), the rating bias for each movie as a function of time (year)
+#           #lambda1 <- 0 #3
+#           movie_time_bias <- cv_train_set %>% 
+#             group_by(movieId, review_year) %>% 
+#             summarize(b_i_time = sum(rating - mu) / (n() + lambda1))
+#           cv_train_set <- left_join(cv_train_set, movie_time_bias, by = c("movieId", "review_year"))
+#           
+#           # find the user rating bias for each user
+#           #lambda2 <- 0 #5
+#           user_bias <- cv_train_set %>% 
+#             group_by(userId) %>% 
+#             summarize(b_u = sum(rating - mu - b_i_time) / (n() + lambda2) )
+#           cv_train_set <- left_join(cv_train_set, user_bias, by = "userId")
+#           
+#           cv_pred <- cv_test_set %>% 
+#             left_join(movie_time_bias, by = c("movieId", "review_year")) %>% 
+#             mutate(b_i_time = if_else(is.na(b_i_time), 0, b_i_time)) %>%   
+#             left_join(user_bias, by = "userId") %>% 
+#             mutate(pred_c = mu + b_i_time + b_u)
+#         
+#             r <- rbind(r, RMSE(cv_pred$pred_c, cv_test_set$rating))
+#         
+#         }
+#       
+#     rmse <- mean(r)
+#     mjb <- rbind(mjb, data.frame(lambda1, lambda2, rmse))
+#       
+#     }
+# }
+# 
+# mjb <- arrange(mjb, rmse)
+# print(mjb)
+
+
+
+# # # # # #
+#
+# code used to tune parameters for XGBoost model
+#
+# # # # # #
+#
+# set.seed(1)
+# fitControl <- trainControl(method = "cv", number = 5)
+#
+# # choose sample of train_set to tune parameters, 
+# # don't have enough computing resources to use the entire train_set
+# probe_set <- sample_n(train_set, 1000000)
+# 
+# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
+#              data = probe_set,
+#              method = "xgbTree",
+#              tuneGrid = xgbGrid,
+#              trControl = fitControl,
+#              preProcess = c("center", "scale"))
+# 
+
+
+
+# # # # # #
+#
+# code used to tune parameters for NNet model
+#
+# # # # # #
+#
+# set.seed(1)
+# probe_set <- sample_n(train_set, 1000000)
+# 
+# fitControl <- trainControl(method = "cv", number = 5)
+# 
+# fit <- train(rating ~ b_u + b_i_time + movie_age_at_rating + num_of_reviews_of_movie + movie_release_year,
+#              data = probe_set,
+#              method = "nnet",
+#              trControl = fitControl,
+#              preProcess = c("center", "scale"),
+#              linout = TRUE)
+#
+
+```
+
