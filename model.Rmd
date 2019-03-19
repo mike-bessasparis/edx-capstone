@@ -45,10 +45,10 @@ if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.
 if(!require(lubridate)) install.packages("lubridate", repos = "http://cran.us.r-project.org")
 if(!require(doParallel)) install.packages("doParallel", repos = "http://cran.us.r-project.org")
 
-# setup for parallel processing 
-cl <- makePSOCKcluster(6)
-registerDoParallel(cl)
-
+# some local storage for saved edx data frame and RMSE file.
+if (!dir.exists("./rda")) {
+        dir.create("./rda")
+}
 
 #############################################################
 # Create edx set, validation set, and submission file
@@ -94,6 +94,11 @@ validation <- temp %>%
 
 removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
+
+# save the edx set for use in the Report
+# rather than downloading and building again
+#
+saveRDS(edx, "./rda/edx.rds")
 
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
@@ -243,6 +248,11 @@ rm(pred_custom)
 Selection of features to include in this model was made over many previous iterations of train() using a small sample of the train_set.  The final set of features showed the best promise of working well on the entire data set.  The model has been previously trained to optimize parameters.  Code is included at the end of this notebook for completeness.  I use train() here, instead of calling XGBoost directly, for convenience.
 ``` {r}
 
+# setup for parallel processing 
+cores <- detectCores()
+cl <- makePSOCKcluster(cores-1)
+registerDoParallel(cl)
+
 start_xgb <- Sys.time()
 
 xgbGrid <- expand.grid(gamma = 0,
@@ -284,11 +294,18 @@ rmse_xgb <- RMSE(pred_xgb$pred_x, eval_set$rating)
 
 rm(eval_set_working, xgbGrid, q, pred_xgb, start_xgb)
 
+stopCluster(cl)
+
 ```
 
 #### Neural Network
 Model has been previously trained and parameters optimized by caret::train().  Code is included at the end of this notebook for completeness.
 ```{r}
+
+# setup for parallel processing 
+cores <- detectCores()
+cl <- makePSOCKcluster(cores-1)
+registerDoParallel(cl)
 
 start_nnet <- Sys.time()
 
@@ -327,6 +344,8 @@ rmse_nnet <- RMSE(pred_nnet$pred_n, eval_set$rating)
 
 rm(nnetGrid, fit, q, pred_nnet, eval_set_working, start_nnet)
 
+stopCluster(cl)
+
 ```
 
 ***
@@ -343,17 +362,13 @@ print(RMSE_ensemble)
 # save the final RMSE for use in the report
 m <- c("Ensemble", "Custom", "XGBoost", "NNet")
 rmse <- round(c(RMSE_ensemble, rmse_custom, rmse_xgb, rmse_nnet), 4)
-rmse_df <- data_frame(m, rmse)
+rmse_df <- tibble(m, rmse)
 
-if (!dir.exists("./rda")) {
-        dir.create("./rda")
-}
-        
 saveRDS(rmse_df, "./rda/final-rmse.rds")
 
 rm(movie_time_bias, user_bias, mu, train_set, eval_set,
    validation, RMSE, cl, ensemble_preds, test_set)
-rm(m, rmse_custom, rmse_nnet, rmse_xgb, RMSE_ensemble, rmse)
+rm(m, rmse_custom, rmse_nnet, rmse_xgb, RMSE_ensemble, rmse, cores)
 
 gc()
 ```

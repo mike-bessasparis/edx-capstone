@@ -8,6 +8,13 @@ output:
 
 ```{r echo=FALSE, results='hide', message = FALSE}
 
+# # # # # # # 
+#
+#  The model.rmd files must be run before this in order to create the RMSE and edx files
+#  used in this notebook.
+#
+# # # # # # #
+
 if(!require(tidyverse)) install.packages("tidyverse", 
                                          repos = "http://cran.us.r-project.org")
 if(!require(ggthemes)) install.packages("ggthemes", 
@@ -17,59 +24,14 @@ if(!require(lubridate)) install.packages("lubridate",
 if(!require(corrplot)) install.packages("corrplot", 
                                         repos = "http://cran.us.r-project.org")
 
-
-#############################################################
-# Create edx set, validation set, and submission file
-#############################################################
-
-# Note: this process could take a couple of minutes
-
-if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
-if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
-
-# MovieLens 10M dataset:
-# https://grouplens.org/datasets/movielens/10m/
-# http://files.grouplens.org/datasets/movielens/ml-10m.zip
-
-dl <- tempfile()
-download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
-
-ratings <- read.table(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
-                      col.names = c("userId", "movieId", "rating", "timestamp"))
-
-movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
-colnames(movies) <- c("movieId", "title", "genres")
-movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))[movieId],
-                                           title = as.character(title),
-                                           genres = as.character(genres))
-
-movielens <- left_join(ratings, movies, by = "movieId")
-
-# Validation set will be 10% of MovieLens data
-
-set.seed(1)
-test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
-edx <- movielens[-test_index,]
-temp <- movielens[test_index,]
-
-# Make sure userId and movieId in validation set are also in edx set
-
-validation <- temp %>% 
-     semi_join(edx, by = "movieId") %>%
-     semi_join(edx, by = "userId")
-
-# Add rows removed from validation set back into edx set
-
-removed <- anti_join(temp, validation)
-edx <- rbind(edx, removed)
-
-rm(dl, ratings, movies, test_index, temp, movielens, removed)
-
 # # # # # # 
 #
-# Must run the model.rmd file to generate the RMSE file
+# Must run the model.rmd file to generate the RMSE and edx files
 #
+# # # # # # 
+
 final_rmse <- readRDS(file = "./rda/final-rmse.rds")
+edx <- readRDS(file = "./rda/edx.rds")
 
 ```
 
@@ -575,12 +537,12 @@ First thing we notice is that the two strongest predictors of rating are the ite
 
 We'll use all proposed predictors except `review_year` and `movie_release_year` in our models.
 
-```{r echo = FALSE, results = "hide"}
+```{r echo = FALSE, message = FALSE, warning = FALSE, results = "hide"}
 
 #Clean up
 
 rm(edx_working, mu, NAcol, t, c, edx, edx_100k, edx_matrix, final_rmse, movie_time_bias,
-   movieId_by_genre, rmse_df, user_bias, validation, num_genres)
+   movieId_by_genre, rmse_df, user_bias, num_genres)
 gc()
 
 ```
